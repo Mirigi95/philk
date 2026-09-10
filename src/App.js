@@ -1,9 +1,9 @@
 import React from 'react';
 import './App.css';
-import Login from './front/Login';
+import Login from './front/Login.js';
 import { ToastContainer } from 'react-toastify';
-import AxiosInterceptor, { ProtectedRoute } from './services/Intercept';
-import AdminDashboard from './dashes/AdminDash';
+import AxiosInterceptor, { ProtectedRoute } from './services/Intercept.jsx';
+import AdminDashboard from './dashes/AdminDash.js';
 import { Routes, Route } from 'react-router-dom';
 
 function AppContent() {

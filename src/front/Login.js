@@ -7,8 +7,8 @@ import {
   sendPasswordResetEmail 
 } from "firebase/auth";
 import { Eye, EyeOff, Loader2, ShieldCheck, ArrowLeft, Activity, HeartPulse, UserCheck } from "lucide-react";
-import { auth } from "../fb/init";
-import api from "../services/api";
+import { auth } from "../fb/init.js";
+import api from "../services/api.js";
 
 const Login = () => {
   const [email, setEmail] = useState("");

@@ -1,7 +1,7 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from './api';
+import api from './api.js';
 
 // 1. The Protected Route Guard
 export const ProtectedRoute = () => {
