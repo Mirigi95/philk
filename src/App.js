@@ -1,18 +1,37 @@
 import React from 'react';
 import './App.css';
 import Login from './front/Login';
+import { ToastContainer } from 'react-toastify';
+import AxiosInterceptor, { ProtectedRoute } from './services/Intercept';
+import AdminDashboard from './dashes/AdminDash';
+import { Routes, Route } from 'react-router-dom';
+
+function AppContent() {
+  return (
+    <Routes>
+ <Route path="/" element={<Login />} />
+  <Route path="/login" element={<Login />} />
+
+      <Route element={<ProtectedRoute />}>
+        <Route path='/admin' element={<AdminDashboard />} >
+
+        </Route>
+        </Route>
+    </Routes>
+  );
+}
 
 function App() {
   return (
-    <div className="bg-slate-300">
-      <main className="bg-teal-300 p-4 border-spacing-1">
-        <div className="card">
-   
-
-          <Login />
-        </div>
-      </main>
-    </div>
+    <AxiosInterceptor>
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        theme="colored"
+      />
+      <AppContent />
+     {/* <SpeedInsights /> */}
+    </AxiosInterceptor>
   );
 }
 

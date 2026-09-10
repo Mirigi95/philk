@@ -1,24 +1,26 @@
-import admin from "firebase-admin";
-import { database } from "firebase-admin";
+import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 import "dotenv/config";
 
-if (!admin.apps.length) {
+if (!getApps().length) {
   try {
     const serviceAccount = JSON.parse(
       Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, "base64").toString("utf8")
     );
 
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
+    initializeApp({
+      credential: cert(serviceAccount),
+      databaseURL: "https://philcare-k-default-rtdb.firebaseio.com",
     });
 
-   // console.error("✅ Firebase Admin initialized");
+    console.log("✅ Firebase Admin initialized");
   } catch (error) {
     console.error("❌ Firebase Admin init failed:", error.message);
   }
 }
 
-const auth = admin.auth();
-const firestore = admin.firestore();
+const auth = getAuth();
+const firestore = getFirestore();
 
-export { admin, auth, firestore };
+export { auth, firestore };

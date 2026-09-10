@@ -19,11 +19,38 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
 
+  // Helper function to process backend verification
+  const processServerAuth = async (token) => {
+    sessionStorage.setItem("token", token);
+
+    // Pass token explicitly in Authorization header
+    const res = await api.post(
+      "/auth",
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const { role, clientId, user } = res.data;
+
+    // Persist user context
+    sessionStorage.setItem("role", role);
+    sessionStorage.setItem("clientId", clientId);
+    sessionStorage.setItem("userName", user?.name || user?.fullName || "User");
+
+    // Route based on role
+    window.location.href = role === "Admin" ? "/admin" : "/dashboard";
+  };
+
   // --- Auth Logic ---
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
     setMessage("");
+
     if (!email || !password) {
       setError("All fields are required");
       return;
@@ -33,19 +60,12 @@ const Login = () => {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       const token = await cred.user.getIdToken();
-      sessionStorage.setItem("token", token);
-
-      const res = await api.post("/auth");
-      const { role, clientId, user } = res.data;
-
-      sessionStorage.setItem("role", role);
-      sessionStorage.setItem("clientId", clientId);
-      sessionStorage.setItem("userName", user?.name || "");
-
-      window.location.href = role === "Admin" ? "/admin" : "/dashboard";
+      await processServerAuth(token);
     } catch (err) {
-      console.error(err);
-      setError("Invalid email or password");
+      console.error("Login Error:", err);
+      setError(
+        err.response?.data?.message || "Invalid email or password"
+      );
       setPassword("");
     } finally {
       setLoading(false);
@@ -60,18 +80,9 @@ const Login = () => {
     try {
       const result = await signInWithPopup(auth, provider);
       const token = await result.user.getIdToken();
-      sessionStorage.setItem("token", token);
-
-      const res = await api.post("/auth");
-      const { role, clientId, user } = res.data;
-
-      sessionStorage.setItem("role", role);
-      sessionStorage.setItem("clientId", clientId);
-      sessionStorage.setItem("userName", user?.name || "");
-
-      window.location.href = role === "Admin" ? "/admin" : "/dashboard";
+      await processServerAuth(token);
     } catch (err) {
-      console.error(err);
+      console.error("Google Auth Error:", err);
       setError("Google Sign-in failed. Please try again.");
     } finally {
       setLoading(false);
@@ -82,17 +93,19 @@ const Login = () => {
     e.preventDefault();
     setError("");
     setMessage("");
+
     if (!email) {
       setError("Please enter your email address first.");
       return;
     }
     setLoading(true);
+
     try {
       await sendPasswordResetEmail(auth, email);
       setMessage("Reset link sent! Check your inbox.");
       setTimeout(() => setIsResetMode(false), 3000);
     } catch (err) {
-      console.error(err);
+      console.error("Reset Error:", err);
       setError("Failed to send reset email. Verify your address.");
     } finally {
       setLoading(false);

@@ -22,7 +22,7 @@ export default async function handler(req, res) {
 
     // Security check: Ensure schoolId exists
     if (!userData.clientId) {
-      //console.error(userData.clientId);
+      console.error(userData.clientId);
       return res.status(403).json({ message: "User is not assigned to a sacco" });
     }
     //console.log(userData);
@@ -32,13 +32,13 @@ export default async function handler(req, res) {
       uid: decoded.uid,
       role: userData.role,
       clientId: userData.clientId,
-      name: userData.fullName,
+      name: userData.name,
       email: decoded.email,
       serverTime: Date.now(), // Used by frontend to sync auto-logout
     });
 
   } catch (err) {
-    //console.error("Auth Error:", err.message);
+    console.error("Auth Error:", err.message);
     res.status(401).json({ message: "Invalid or expired token" });
   }
 }
