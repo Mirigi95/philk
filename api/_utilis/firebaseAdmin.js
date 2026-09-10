@@ -14,7 +14,7 @@ if (!getApps().length) {
       databaseURL: "https://philcare-k-default-rtdb.firebaseio.com",
     });
 
-    console.log("✅ Firebase Admin initialized");
+   // console.log("✅ Firebase Admin initialized");
   } catch (error) {
     console.error("❌ Firebase Admin init failed:", error.message);
   }
