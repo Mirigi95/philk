@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, Link, Outlet } from "react-router-dom"; // Assumes react-router-dom
+import { useNavigate, Link, Outlet } from "react-router-dom";
 import { 
   Users, 
   Calendar, 
@@ -15,11 +15,16 @@ import {
   CreditCard,
   LogOut,
   Loader2,
-  Shield
+  Shield,
+  X
 } from "lucide-react";
+import AppointmentForm from "../front/NewAppointment";
+import Appointments from "../front/Appointments";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+ const name = sessionStorage.getItem("UserName");
+ const role = sessionStorage.getItem("role");
   
   // Local state
   const [userName, setUserName] = useState("");
@@ -29,33 +34,52 @@ export default function AdminDashboard() {
     totalPatients: 0,
     todayAppointments: 0,
   });
+  
+  // Local Form View States
+  const [view, setView] = useState("list"); // 'list' | 'add-appointment'
+  const [selectedClient, setSelectedClient] = useState(null);
+
+  // Trigger Form Handler
+  const handleOpenAppointmentForm = (client = null) => {
+    setSelectedClient(client);
+    setView("add-appointment");
+  };
+
+  const handleCloseAppointmentForm = () => {
+    setSelectedClient(null);
+    setView("list");
+  };
+
+  const handleAppointmentSuccess = () => {
+    handleCloseAppointmentForm();
+    fetchDashboardData(); // Refresh metrics and appointments
+  };
 
   useEffect(() => {
-    // 1. Retrieve current logged-in user name
     const storedName = sessionStorage.getItem("userName") || localStorage.getItem("userName");
     if (storedName) setUserName(storedName);
 
-    // 2. Fetch Dashboard Data
     fetchDashboardData();
   }, []);
 
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      // Get auth token (if applicable)
       const token = localStorage.getItem("token") || sessionStorage.getItem("token");
       const headers = { Authorization: `Bearer ${token}` };
 
-      // Fetch Clients and Appointments from your APIs
       const [clientsRes, apptsRes] = await Promise.all([
-        fetch("/api/clients", { headers }).then((res) => res.ok ? res.json() : []),
-        fetch("/api/appointments", { headers }).then((res) => res.ok ? res.json() : [])
+        fetch("/api/clients", { headers }).then((res) => (res.ok ? res.json() : [])),
+        fetch("/api/appointments", { headers }).then((res) => (res.ok ? res.json() : []))
       ]);
 
-      setAppointments(apptsRes.slice(0, 5)); // Grab latest 5 appointments
+      const clientList = Array.isArray(clientsRes) ? clientsRes : clientsRes.clients || [];
+      const apptList = Array.isArray(apptsRes) ? apptsRes : apptsRes.appointments || [];
+
+      setAppointments(apptList.slice(0, 5));
       setStatsData({
-        totalPatients: clientsRes.length || 0,
-        todayAppointments: apptsRes.length || 0,
+        totalPatients: clientList.length || 0,
+        todayAppointments: apptList.length || 0,
       });
     } catch (error) {
       console.error("Error loading dashboard data:", error);
@@ -64,12 +88,9 @@ export default function AdminDashboard() {
     }
   };
 
-  // Logout Handler
   const handleLogout = async () => {
     try {
       const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-      
-      // Call backend API logout if endpoint exists
       await fetch("/api/auth/logout", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` }
@@ -77,14 +98,12 @@ export default function AdminDashboard() {
     } catch (err) {
       console.error("Logout request error:", err);
     } finally {
-      // Clear session & local storage then redirect
       sessionStorage.clear();
       localStorage.clear();
       navigate("/login");
     }
   };
 
-  // Setup Checklist Tasks
   const setupTasks = [
     { id: 1, title: "Clinic Profile & Operating Hours", completed: true, route: "/admin/settings" },
     { id: 2, title: "Add Staff & Doctors", completed: true, route: "/admin/staff" },
@@ -92,7 +111,6 @@ export default function AdminDashboard() {
     { id: 4, title: "Setup Billing & Insurance Codes", completed: false, route: "/admin/billing" },
   ];
 
-  // Dynamic Dashboard Stats
   const stats = [
     { 
       title: "Total Patients", 
@@ -128,7 +146,6 @@ export default function AdminDashboard() {
     },
   ];
 
-  // System Modules Roadmap
   const roadmapModules = [
     {
       title: "Electronic Health Records (EHR)",
@@ -161,12 +178,12 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 space-y-8">
-      {/* Top Banner / Welcome with Logout Button */}
+    <div className="min-h-screen bg-slate-50 p-6 space-y-8 relative">
+      {/* Top Banner / Welcome */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">
-            Welcome back, {userName || "Admin"} 👋
+            Welcome back, {role} {name || "Admin"} 👋
           </h1>
           <p className="text-slate-500 text-sm mt-1">
             PhilCare Clinic System Management Portal
@@ -174,11 +191,18 @@ export default function AdminDashboard() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
+          {/* Direct view toggle instead of page navigation */}
           <button 
-            onClick={() => navigate("/admin/appointments/new")}
+            onClick={() => handleOpenAppointmentForm()}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition-all text-sm cursor-pointer"
           >
             <Plus size={18} /> New Appointment
+          </button>
+           <button 
+            onClick={() => navigate("/admin/appointment")}
+            className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2.5 rounded-lg transition-all text-sm cursor-pointer"
+          >
+            <Users size={18} /> Appointments
           </button>
           
           <button 
@@ -187,14 +211,14 @@ export default function AdminDashboard() {
           >
             <Users size={18} /> Add Patient
           </button>
-           <button 
+          
+          <button 
             onClick={() => navigate("/admin/list")}
             className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2.5 rounded-lg transition-all text-sm cursor-pointer"
           >
-            <Users size={18} /> All Patient
+            <Users size={18} /> All Patients
           </button>
 
-          {/* Logout Button */}
           <button 
             onClick={handleLogout}
             className="flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-medium px-4 py-2.5 rounded-lg transition-all text-sm cursor-pointer"
@@ -203,6 +227,27 @@ export default function AdminDashboard() {
           </button>
         </div>
       </div>
+
+      {/* Dynamic Overlay Modal for Appointment Form */}
+      {view === "add-appointment" && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden relative">
+            <button 
+              onClick={handleCloseAppointmentForm}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors z-10"
+            >
+              <X size={20} />
+            </button>
+            <div className="p-2">
+              <AppointmentForm
+                preselectedClient={selectedClient}
+                onCancel={handleCloseAppointmentForm}
+                onSuccess={handleAppointmentSuccess}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Dynamic System Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -229,7 +274,7 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Left Column (2 Cols wide) */}
+        {/* Main Left Column */}
         <div className="lg:col-span-2 space-y-8">
           
           {/* Module Development Roadmap */}
@@ -275,57 +320,12 @@ export default function AdminDashboard() {
               </Link>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-600">
-                <thead className="bg-slate-50 text-slate-400 text-xs uppercase tracking-wider">
-                  <tr>
-                    <th className="p-3">Patient</th>
-                    <th className="p-3">Doctor</th>
-                    <th className="p-3">Date / Time</th>
-                    <th className="p-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {loading ? (
-                    <tr>
-                      <td colSpan="4" className="p-4 text-center text-slate-400">
-                        Loading appointments...
-                      </td>
-                    </tr>
-                  ) : appointments.length === 0 ? (
-                    <tr>
-                      <td colSpan="4" className="p-4 text-center text-slate-400">
-                        No appointments booked yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    appointments.map((appt) => (
-                      <tr key={appt.id}>
-                        <td className="p-3 font-medium text-slate-800">{appt.clientName || appt.clientId}</td>
-                        <td className="p-3">{appt.doctorName || "General Practitioner"}</td>
-                        <td className="p-3">{appt.appointmentDate ? new Date(appt.appointmentDate).toLocaleString() : "N/A"}</td>
-                        <td className="p-3">
-                          <span className={`px-2 py-1 text-xs rounded-full font-medium ${
-                            appt.status === "Completed" 
-                              ? "bg-emerald-100 text-emerald-700"
-                              : appt.status === "Cancelled"
-                              ? "bg-red-100 text-red-700"
-                              : "bg-blue-100 text-blue-700"
-                          }`}>
-                            {appt.status || "Scheduled"}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+           <Appointments />
           </div>
 
         </div>
 
-        {/* Right Column (1 Col wide) */}
+        {/* Right Column */}
         <div className="space-y-8">
           
           {/* Setup Onboarding Guidance */}
@@ -341,7 +341,7 @@ export default function AdminDashboard() {
                       <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />
                     ) : (
                       <Circle size={18} className="text-slate-300 shrink-0" />
-                    )}
+                    ) }
                     <span className={`text-xs font-medium ${task.completed ? "line-through text-slate-400" : "text-slate-700"}`}>
                       {task.title}
                     </span>
@@ -386,7 +386,6 @@ export default function AdminDashboard() {
   );
 }
 
-// Helper component icon
 function FileTextIcon(props) {
   return (
     <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

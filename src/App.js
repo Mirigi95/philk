@@ -8,8 +8,11 @@ import { Routes, Route } from 'react-router-dom';
 import { NewClient } from './doc/NewClient.js';
 import AdminLayout from './dashes/AdminLayout.js';
 import ClientList from './front/ClienstList.js';
+import useAutoLogout from './Autologout.js';
+import Appointments from './front/Appointments.js';
 
 function AppContent() {
+  useAutoLogout(15);
   return (
     <Routes>
       <Route path="/" element={<Login />} />
@@ -20,6 +23,7 @@ function AppContent() {
           <Route index element={<AdminDashboard/>} />
           <Route path="client" element={<NewClient />} />
           <Route path='list' element={<ClientList/>} />
+          <Route path='appointment' element={<Appointments />} />
         </Route>
       </Route>
     </Routes>
