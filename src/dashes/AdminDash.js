@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom"; // Assumes react-router-dom
+import { useNavigate, Link, Outlet } from "react-router-dom"; // Assumes react-router-dom
 import { 
   Users, 
   Calendar, 
@@ -182,10 +182,16 @@ export default function AdminDashboard() {
           </button>
           
           <button 
-            onClick={() => navigate("/admin/patients/add")}
+            onClick={() => navigate("/admin/client")}
             className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2.5 rounded-lg transition-all text-sm cursor-pointer"
           >
             <Users size={18} /> Add Patient
+          </button>
+           <button 
+            onClick={() => navigate("/admin/list")}
+            className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2.5 rounded-lg transition-all text-sm cursor-pointer"
+          >
+            <Users size={18} /> All Patient
           </button>
 
           {/* Logout Button */}
@@ -375,6 +381,7 @@ export default function AdminDashboard() {
 
         </div>
       </div>
+      <Outlet />
     </div>
   );
 }

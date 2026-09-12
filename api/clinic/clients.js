@@ -1,4 +1,4 @@
-import { auth, firestore } from "../../_utilis/firebaseAdmin";
+import {auth, firestore} from "../_utilis/firebaseAdmin.js"
 
 export default async function handler(req, res) {
   // 1. Verify Authorization Header

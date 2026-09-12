@@ -1,0 +1,7 @@
+
+
+const NewAppointmnt = ()=>{
+
+}
+
+export {NewAppointmnt}
