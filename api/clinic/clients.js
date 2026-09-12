@@ -9,7 +9,7 @@ export default async function handler(req, res) {
 
   const tenantId = session.clientId; // Fixed typo: clientId instead of clientsId
   const createdBy = session.name || "System";
-  console.log("used id", tenantId);
+ // console.log("used id", tenantId);
 
   const { method } = req;
 

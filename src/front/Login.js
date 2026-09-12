@@ -34,12 +34,14 @@ const Login = () => {
       }
     );
 
-    const { role, clientId, user } = res.data;
+    const { role, clientId, facility, name } = res.data;
+    console.log(res.data);
 
     // Persist user context
     sessionStorage.setItem("role", role);
+     sessionStorage.setItem("facility", facility);
     sessionStorage.setItem("clientId", clientId);
-    sessionStorage.setItem("userName", user?.name || user?.fullName || "User");
+    sessionStorage.setItem("userName", name);
 
     // Route based on role
     window.location.href = role === "Admin" ? "/admin" : "/dashboard";

@@ -10,6 +10,7 @@ import AdminLayout from './dashes/AdminLayout.js';
 import ClientList from './front/ClienstList.js';
 import useAutoLogout from './Autologout.js';
 import Appointments from './front/Appointments.js';
+import ConsultationForm from './front/Connsultations.js';
 
 function AppContent() {
   useAutoLogout(15);
@@ -24,6 +25,7 @@ function AppContent() {
           <Route path="client" element={<NewClient />} />
           <Route path='list' element={<ClientList/>} />
           <Route path='appointment' element={<Appointments />} />
+          <Route path='consult' element={<ConsultationForm />} />
         </Route>
       </Route>
     </Routes>

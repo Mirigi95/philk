@@ -1,27 +1,32 @@
 import React, { useState, useEffect } from "react";
-import { 
-  User, 
-  Search, 
-  Plus, 
-  Calendar, 
-  Phone, 
-  MapPin, 
-  Activity, 
-  Clock, 
-  Eye, 
-  ShieldAlert, 
-  CheckCircle2,
+import {
+  User,
+  Search,
+  Plus,
+  Calendar,
+  Phone,
+  MapPin,
+  Activity,
+  ShieldAlert,
   ChevronRight,
-  Filter
+  Filter,
+  X
 } from "lucide-react";
 import api from "../services/api";
+import AppointmentForm from "./NewAppointment";
+import { NewClient } from "../doc/NewClient";
 
 const ClientList = ({ onAddNewClient, onAddAppointment }) => {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Modal States
   const [selectedClientVitals, setSelectedClientVitals] = useState(null);
+  const [appointmentModal, setAppointmentModal] = useState(false);
+  const [selectedClientForAppointment, setSelectedClientForAppointment] = useState(null);
+  const [showNewClientModal, setShowNewClientModal] = useState(false);
 
   // Fetch all clients
   const fetchClients = async () => {
@@ -32,8 +37,7 @@ const ClientList = ({ onAddNewClient, onAddAppointment }) => {
       const response = await api.get("/clinic/clients", {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      // Handle both direct array or wrapped data structure
+
       const data = response.data?.clients || response.data || [];
       setClients(data);
     } catch (err) {
@@ -47,7 +51,7 @@ const ClientList = ({ onAddNewClient, onAddAppointment }) => {
     fetchClients();
   }, []);
 
-  // Filter clients by Name, Client ID, or Phone
+  // Filter clients by Name, Client ID, Phone, or Nat ID
   const filteredClients = clients.filter((client) => {
     const term = searchTerm.toLowerCase();
     return (
@@ -57,6 +61,25 @@ const ClientList = ({ onAddNewClient, onAddAppointment }) => {
       client.idNo?.toLowerCase().includes(term)
     );
   });
+
+  // Open Appointment Modal
+  const handleOpenAppointment = (client) => {
+    if (onAddAppointment) {
+      onAddAppointment(client);
+    } else {
+      setSelectedClientForAppointment(client);
+      setAppointmentModal(true);
+    }
+  };
+
+  // Open Registration Modal
+  const handleOpenNewClient = () => {
+    if (onAddNewClient) {
+      onAddNewClient();
+    } else {
+      setShowNewClientModal(true);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 p-4 md:p-6">
@@ -74,7 +97,7 @@ const ClientList = ({ onAddNewClient, onAddAppointment }) => {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={onAddNewClient}
+            onClick={handleOpenNewClient}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-xl text-sm shadow-sm transition-all"
           >
             <Plus size={18} />
@@ -190,7 +213,7 @@ const ClientList = ({ onAddNewClient, onAddAppointment }) => {
                     <td className="py-4 px-6 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
-                          onClick={() => onAddAppointment && onAddAppointment(client)}
+                          onClick={() => handleOpenAppointment(client)}
                           className="flex items-center gap-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 font-medium px-3 py-1.5 rounded-lg text-xs transition-colors"
                           title="Schedule Appointment"
                         >
@@ -207,7 +230,7 @@ const ClientList = ({ onAddNewClient, onAddAppointment }) => {
         )}
       </div>
 
-      {/* Vitals Detail Modal */}
+      {/* 1. Vitals Detail Modal */}
       {selectedClientVitals && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
@@ -216,11 +239,11 @@ const ClientList = ({ onAddNewClient, onAddAppointment }) => {
                 <Activity className="text-emerald-500" size={18} />
                 Initial Vitals ({selectedClientVitals.fullName})
               </h3>
-              <button 
+              <button
                 onClick={() => setSelectedClientVitals(null)}
-                className="text-slate-400 hover:text-slate-600 text-xs font-bold"
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
               >
-                ✕
+                <X size={16} />
               </button>
             </div>
 
@@ -257,6 +280,39 @@ const ClientList = ({ onAddNewClient, onAddAppointment }) => {
             >
               Close Vitals
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 2. New Appointment Modal */}
+      {appointmentModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl relative my-8">
+            <button
+              onClick={() => setAppointmentModal(false)}
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1"
+            >
+              <X size={18} />
+            </button>
+            <AppointmentForm 
+              client={selectedClientForAppointment} 
+              onClose={() => setAppointmentModal(false)} 
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 3. Register New Client Modal */}
+      {showNewClientModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-4xl w-full p-6 shadow-xl relative my-8">
+            <NewClient
+              onCancel={() => setShowNewClientModal(false)}
+              onSuccess={() => {
+                setShowNewClientModal(false);
+                fetchClients(); // Refresh list after adding
+              }}
+            />
           </div>
         </div>
       )}
