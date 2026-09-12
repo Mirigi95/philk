@@ -250,6 +250,14 @@ export default function AdminDashboard() {
       color: "bg-slate-800",
       hover: "hover:bg-slate-900",
     },
+     {
+      title: "Treatment",
+      description: "Manage patient records",
+      icon: Users,
+      action: () => navigate("/admin/treatment"),
+      color: "bg-slate-800",
+      hover: "hover:bg-slate-900",
+    },
   ];
 
   return (
