@@ -12,6 +12,8 @@ import useAutoLogout from './Autologout.js';
 import Appointments from './front/Appointments.js';
 import ConsultationForm from './front/Connsultations.js';
 import TreatmentForm from './front/Treatment.js';
+import ConsultationsList from './front/ConsultationList.js';
+import PatientTreatmentHistory from './front/PatientHistory.js';
 
 function AppContent() {
   useAutoLogout(15);
@@ -27,6 +29,8 @@ function AppContent() {
           <Route path='list' element={<ClientList/>} />
           <Route path='appointment' element={<Appointments />} />
           <Route path='consult' element={<ConsultationForm />} />
+          <Route path='constlist' element={<ConsultationsList />} />
+          <Route path='history' element={<PatientTreatmentHistory />} />
            <Route path='treatment' element={<TreatmentForm />} />
         </Route>
       </Route>

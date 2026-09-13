@@ -1,8 +1,16 @@
 import { firestore } from "../_utilis/firebaseAdmin.js";
 import { verifySession } from "../auth/verify.js";
 
+// Helper to format date into MM/YY string
+function getMMYY(dateString) {
+  const date = dateString ? new Date(dateString) : new Date();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = String(date.getFullYear()).slice(-2);
+  return `${month}/${year}`;
+}
+
 export default async function handler(req, res) {
-  // 1. Authenticate & extract tenant session (role, clientId, name, uid)
+  // 1. Authenticate & extract tenant session
   const session = await verifySession(req, res);
   if (!session) return; // verifySession returns 401/403 directly on failure
 
@@ -14,20 +22,17 @@ export default async function handler(req, res) {
   }
 
   // Multi-tenant subcollection targeting the user's facility
-  const apptsCollection = firestore
-    .collection("facility")
-    .doc(facilityId)
-    .collection("appointments");
+  const facilityRef = firestore.collection("facility").doc(facilityId);
+  const apptsCollection = facilityRef.collection("appointments");
+  const counterRef = facilityRef.collection("counters").doc("appointments");
 
   const { method } = req;
 
   switch (method) {
-    // READ APPOINTMENTS (Scoped to user's facility)
+    // READ APPOINTMENTS
     case "GET": {
       try {
-    
-
-         const snapshot = await apptsCollection.orderBy("createdAt", "desc").get();
+        const snapshot = await apptsCollection.orderBy("createdAt", "desc").get();
         const appointments = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
@@ -39,7 +44,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // CREATE APPOINTMENT
+    // CREATE APPOINTMENT (With Custom Formatted ID 01/MM/YY)
     case "POST": {
       try {
         const { clientId, clientName, appointmentDate, doctorName, notes, status } = req.body;
@@ -48,23 +53,48 @@ export default async function handler(req, res) {
           return res.status(400).json({ message: "clientId and appointmentDate are required." });
         }
 
-        const newAppointment = {
-          clientId, // Patient ID
-          clientName: clientName || "",
-          appointmentDate,
-          doctorName: doctorName || session.name || "",
-          notes: notes || "",
-          status: status || "Scheduled",
-          createdBy,
-          createdAt: new Date().toISOString(),
-        };
+        const mmYY = getMMYY(appointmentDate);
 
-        const docRef = await apptsCollection.add(newAppointment);
+        // Transaction ensures concurrent creates do not generate duplicate sequence numbers
+        const appointmentData = await firestore.runTransaction(async (transaction) => {
+          const counterDoc = await transaction.get(counterRef);
+          
+          let currentSeq = 1;
+          if (counterDoc.exists) {
+            currentSeq = (counterDoc.data().currentSequence || 0) + 1;
+          }
+
+          // Format sequence number (e.g., 1 -> "01", 12 -> "12")
+          const formattedSeq = String(currentSeq).padStart(2, "0");
+          const customId = `${formattedSeq}/${mmYY}`;
+
+          // Document ID in Firestore (replacing slashes to avoid path issues)
+          const docId = `${formattedSeq}-${mmYY.replace("/", "-")}`;
+          const newDocRef = apptsCollection.doc(docId);
+
+          const newAppointment = {
+            appointmentId: customId,
+            clientId,
+            clientName: clientName || "",
+            appointmentDate,
+            doctorName: doctorName || session.name || "",
+            notes: notes || "",
+            status: status || "Scheduled",
+            createdBy,
+            createdAt: new Date().toISOString(),
+          };
+
+          // Update sequence counter and write new appointment
+          transaction.set(counterRef, { currentSequence: currentSeq }, { merge: true });
+          transaction.set(newDocRef, newAppointment);
+
+          return { id: docId, ...newAppointment };
+        });
 
         return res.status(201).json({
           message: "Appointment created successfully",
-          id: docRef.id,
-          appointment: newAppointment,
+          id: appointmentData.id,
+          appointment: appointmentData,
         });
       } catch (error) {
         return res.status(500).json({ message: "Failed to create appointment", error: error.message });

@@ -242,6 +242,14 @@ export default function AdminDashboard() {
       color: "bg-violet-600",
       hover: "hover:bg-violet-700",
     },
+     {
+      title: "Consultation List",
+      description: "view consultation",
+      icon: Stethoscope,
+      action: () => navigate("/admin/constlist"),
+      color: "bg-violet-600",
+      hover: "hover:bg-violet-700",
+    },
     {
       title: "View Patients",
       description: "Manage patient records",
@@ -251,10 +259,10 @@ export default function AdminDashboard() {
       hover: "hover:bg-slate-900",
     },
      {
-      title: "Treatment",
+      title: "Treatment History",
       description: "Manage patient records",
       icon: Users,
-      action: () => navigate("/admin/treatment"),
+      action: () => navigate("/admin/history"),
       color: "bg-slate-800",
       hover: "hover:bg-slate-900",
     },

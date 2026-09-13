@@ -1,56 +1,74 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Pill,
   AlertTriangle,
   Plus,
   Trash2,
   Save,
-  FileCheck,
   Calendar,
   Activity,
   User,
-  FlaskConical
+  FlaskConical,
 } from "lucide-react";
+import api from "../services/api";
+
+// Helper to format Date strings / Firestore timestamps to YYYY-MM-DD for HTML date inputs
+const formatDateForInput = (dateVal) => {
+  if (!dateVal) return "";
+  if (typeof dateVal === "string") return dateVal.split("T")[0];
+  if (dateVal instanceof Date) return dateVal.toISOString().split("T")[0];
+  if (typeof dateVal === "object" && dateVal?.seconds) {
+    return new Date(dateVal.seconds * 1000).toISOString().split("T")[0];
+  }
+  return "";
+};
 
 const TreatmentForm = ({
-  appointmentId = "59SsG61hULxspdDa3xBo",
-  clientId = "PHIL/25/004",
-  patientId = "KRzIxQ2lwBrzHqS0H05J",
-  doctorId = "gHZMrXoN1WOvEAMMNn8sxIkK8To2",
-  doctorEmail = "doctor@admin.it",
+  selectedConsultation = null,
   onSuccess,
   onCancel,
 }) => {
-  const [formData, setFormData] = useState({
-    appointmentId,
-    clientId,
-    patientId,
-    doctorId,
-    doctorEmail,
-    diagnosisCode: "KB24",
-    diagnosisNotes: "Congenital pneumonia",
-    treatment: "",
-    notes: "",
-    followUpInterval: "7",
-    followUpDate: "",
-    hasAllergies: false,
-    allergiesList: [],
-    allergies: "",
-    prescription: [{ medication: "amoxyl", frequency: "2/14" }],
-    tests: [],
+  // Helper to build default or synchronized state
+  const buildInitialState = (data) => ({
+    appointmentId: data?.appointmentId || data?.id || "",
+    clientId: data?.clientId || "",
+    patientId: data?.patientId || "",
+    doctorId: data?.doctorId || "",
+    doctorEmail: data?.doctorEmail || "doctor@admin.it",
+    diagnosisCode: data?.diagnosisCode || "",
+    diagnosisNotes: data?.diagnosisNotes || data?.chiefComplaint || "",
+    treatment: data?.treatment || "",
+    notes: data?.notes || "",
+    followUpInterval: String(data?.followUpInterval || "7"),
+    followUpDate: formatDateForInput(data?.followUpDate),
+    hasAllergies: Boolean(data?.allergiesList?.length || data?.hasAllergies),
+    allergiesList: data?.allergiesList || [],
+    allergies: data?.allergies || "",
+    prescription: data?.prescription?.length
+      ? data.prescription
+      : [{ medication: "", frequency: "" }],
+    tests: data?.tests || [],
     vitalSigns: {
-      bloodPressure: "",
-      oxygenSaturation: "",
-      pulse: "",
-      respiratoryRate: "",
-      temperature: "",
+      bloodPressure: data?.vitalSigns?.bloodPressure || "",
+      oxygenSaturation: data?.vitalSigns?.oxygenSaturation || "",
+      pulse: data?.vitalSigns?.pulse || "",
+      respiratoryRate: data?.vitalSigns?.respiratoryRate || "",
+      temperature: data?.vitalSigns?.temperature || "",
     },
   });
 
+  const [formData, setFormData] = useState(() => buildInitialState(selectedConsultation));
   const [currentAllergyInput, setCurrentAllergyInput] = useState("");
   const [currentTestInput, setCurrentTestInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
+
+  // Sync state if selectedConsultation changes after mount
+  useEffect(() => {
+    if (selectedConsultation) {
+      setFormData(buildInitialState(selectedConsultation));
+    }
+  }, [selectedConsultation]);
 
   // Standard Field Handler
   const handleChange = (e) => {
@@ -61,7 +79,7 @@ const TreatmentForm = ({
     }));
   };
 
-  // Vital Signs Handler
+  // Vital Signs Handler (Immutable)
   const handleVitalChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -73,11 +91,14 @@ const TreatmentForm = ({
     }));
   };
 
-  // Prescription Management
+  // Prescription Management (Immutable object updating)
   const handlePrescriptionChange = (index, field, value) => {
-    const updated = [...formData.prescription];
-    updated[index][field] = value;
-    setFormData((prev) => ({ ...prev, prescription: updated }));
+    setFormData((prev) => ({
+      ...prev,
+      prescription: prev.prescription.map((item, i) =>
+        i === index ? { ...item, [field]: value } : item
+      ),
+    }));
   };
 
   const addPrescriptionRow = () => {
@@ -96,16 +117,19 @@ const TreatmentForm = ({
 
   // Allergy Tags Management
   const handleAddAllergy = (e) => {
-    e.preventDefault();
-    if (!currentAllergyInput.trim()) return;
+    if (e) e.preventDefault();
+    const trimmed = currentAllergyInput.trim();
+    if (!trimmed) return;
 
-    const updatedList = [...formData.allergiesList, currentAllergyInput.trim()];
-    setFormData((prev) => ({
-      ...prev,
-      hasAllergies: true,
-      allergiesList: updatedList,
-      allergies: updatedList.join(", "),
-    }));
+    if (!formData.allergiesList.includes(trimmed)) {
+      const updatedList = [...formData.allergiesList, trimmed];
+      setFormData((prev) => ({
+        ...prev,
+        hasAllergies: true,
+        allergiesList: updatedList,
+        allergies: updatedList.join(", "),
+      }));
+    }
     setCurrentAllergyInput("");
   };
 
@@ -121,13 +145,16 @@ const TreatmentForm = ({
 
   // Lab Tests Management
   const handleAddTest = (e) => {
-    e.preventDefault();
-    if (!currentTestInput.trim()) return;
+    if (e) e.preventDefault();
+    const trimmed = currentTestInput.trim();
+    if (!trimmed) return;
 
-    setFormData((prev) => ({
-      ...prev,
-      tests: [...prev.tests, currentTestInput.trim()],
-    }));
+    if (!formData.tests.includes(trimmed)) {
+      setFormData((prev) => ({
+        ...prev,
+        tests: [...prev.tests, trimmed],
+      }));
+    }
     setCurrentTestInput("");
   };
 
@@ -144,39 +171,29 @@ const TreatmentForm = ({
     setLoading(true);
     setMessage({ type: "", text: "" });
 
+    // Clean payload of empty prescription rows
+    const cleanPrescription = formData.prescription.filter(
+      (item) => item.medication.trim() !== "" || item.frequency.trim() !== ""
+    );
+
     const payload = {
-      appointmentId: formData.appointmentId,
-      clientId: formData.clientId,
-      patientId: formData.patientId,
-      doctorId: formData.doctorId,
-      doctorEmail: formData.doctorEmail,
-      diagnosisCode: formData.diagnosisCode,
-      diagnosisNotes: formData.diagnosisNotes,
-      treatment: formData.treatment,
-      notes: formData.notes,
-      followUpInterval: String(formData.followUpInterval),
-      followUpDate: formData.followUpDate ? new Date(formData.followUpDate).toISOString() : null,
-      hasAllergies: formData.hasAllergies,
-      allergies: formData.hasAllergies ? formData.allergies : "",
-      prescription: formData.prescription,
-      tests: formData.tests,
-      vitalSigns: formData.vitalSigns,
+      ...formData,
+      prescription: cleanPrescription,
+      followUpInterval: Number(formData.followUpInterval) || 0,
     };
 
     try {
-      const response = await fetch("/api/treatment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Failed to save treatment record.");
-
+      const response = await api.post("/clinic/treatment", payload);
       setMessage({ type: "success", text: "Treatment plan saved successfully!" });
-      if (onSuccess) onSuccess(result);
+      if (onSuccess) onSuccess(response.data);
     } catch (err) {
-      setMessage({ type: "error", text: err.message });
+      const errorPayload = err.response?.data?.error || err.response?.data?.message || err.message;
+      const errorMsg =
+        typeof errorPayload === "object" && errorPayload !== null
+          ? errorPayload.message || JSON.stringify(errorPayload)
+          : String(errorPayload || "Failed to save treatment record.");
+
+      setMessage({ type: "error", text: errorMsg });
     } finally {
       setLoading(false);
     }
@@ -393,6 +410,7 @@ const TreatmentForm = ({
                 placeholder="Enter test code / ID..."
                 value={currentTestInput}
                 onChange={(e) => setCurrentTestInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddTest(e)}
                 className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none"
               />
               <button
@@ -410,7 +428,11 @@ const TreatmentForm = ({
                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs border border-slate-200 font-mono"
                 >
                   {testId}
-                  <button type="button" onClick={() => handleRemoveTest(idx)} className="text-slate-400 hover:text-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveTest(idx)}
+                    className="text-slate-400 hover:text-slate-700"
+                  >
                     ×
                   </button>
                 </span>

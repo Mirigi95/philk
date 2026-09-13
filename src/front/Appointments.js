@@ -10,10 +10,12 @@ import {
   AlertCircle, 
   Loader2,
   RefreshCw,
-  X
+  X,
+  Stethoscope
 } from "lucide-react";
 import api from "../services/api";
 import AppointmentForm from "./NewAppointment";
+import ConsultationForm from "./Connsultations";
 
 const Appointments = () => {
   const [appointments, setAppointments] = useState([]);
@@ -21,9 +23,11 @@ const Appointments = () => {
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  
+  // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false);
-
- 
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [isConsultationOpen, setIsConsultationOpen] = useState(false);
 
   // 1. Fetch Appointments from API
   const fetchAppointments = useCallback(async () => {
@@ -35,9 +39,8 @@ const Appointments = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      // Handle both direct array or wrapped data structure
       const data = response.data?.clients || response.data || [];
-      setAppointments(data)
+      setAppointments(data);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to fetch client list.");
     } finally {
@@ -49,12 +52,18 @@ const Appointments = () => {
     fetchAppointments();
   }, [fetchAppointments]);
 
+  // Handle opening Consultation Form
+  const handleAttend = (appt) => {
+    setSelectedAppointment(appt);
+    setIsConsultationOpen(true);
+  };
 
   // 3. Filter Appointments locally
   const filteredAppointments = appointments.filter((appt) => {
     const matchesSearch =
       appt.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       appt.clientId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      appt.appointmentId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       appt.doctorName?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus =
@@ -159,10 +168,12 @@ const Appointments = () => {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   <th className="p-4">Patient / ID</th>
+                  <th className="p-4">App Id</th>
                   <th className="p-4">Date & Time</th>
                   <th className="p-4">Assigned Doctor</th>
                   <th className="p-4">Status</th>
                   <th className="p-4">Notes</th>
+                  <th className="p-4">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 text-sm">
@@ -172,6 +183,7 @@ const Appointments = () => {
                       <div className="font-medium text-gray-900">{appt.clientName || "N/A"}</div>
                       <div className="text-xs text-gray-500">ID: {appt.clientId || "N/A"}</div>
                     </td>
+                    <td className="p-4">{appt?.appointmentId || "null"}</td>
                     <td className="p-4">
                       <div className="flex items-center gap-1.5 text-gray-700">
                         <Calendar className="w-4 h-4 text-gray-400" />
@@ -191,6 +203,15 @@ const Appointments = () => {
                     </td>
                     <td className="p-4">{getStatusBadge(appt.status)}</td>
                     <td className="p-4 text-gray-500 max-w-xs truncate">{appt.notes || "-"}</td>
+                    <td className="p-4">
+                      <button 
+                        onClick={() => handleAttend(appt)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium transition cursor-pointer"
+                      >
+                        <Stethoscope className="w-3.5 h-3.5" />
+                        Attend
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -199,33 +220,72 @@ const Appointments = () => {
         )}
       </div>
 
-  {/* Create Modal */}
-{isModalOpen && (
-  <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-    {/* Added 'relative' so absolute positioning pins inside this container */}
-    <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl relative">
-      <button 
-        type="button"
-        onClick={() => setIsModalOpen(false)} // Fixed: uses state setter function
-        className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors z-10 cursor-pointer"
-      >
-        <X size={20} />
-      </button>
+      {/* New Appointment Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl relative">
+            <button 
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors z-10 cursor-pointer"
+            >
+              <X size={20} />
+            </button>
 
-      <h2 className="text-xl font-bold text-gray-900 pr-8">
-        Schedule New Appointment
-      </h2>
+            <h2 className="text-xl font-bold text-gray-900 pr-8">
+              Schedule New Appointment
+            </h2>
 
-      <AppointmentForm 
-        onCancel={() => setIsModalOpen(false)}
-        onSuccess={() => {
-          setIsModalOpen(false);
-          fetchAppointments(); // Call your refresh list handler here
-        }}
-      />
-    </div>
-  </div>
-)}
+            <AppointmentForm 
+              onCancel={() => setIsModalOpen(false)}
+              onSuccess={() => {
+                setIsModalOpen(false);
+                fetchAppointments();
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Consultation / Treatment Modal */}
+      {isConsultationOpen && selectedAppointment && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-xl max-w-4xl w-full p-6 space-y-4 shadow-2xl relative my-8">
+            <button 
+              type="button"
+              onClick={() => {
+                setIsConsultationOpen(false);
+                setSelectedAppointment(null);
+              }}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors z-10 cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="border-b pb-3">
+              <h2 className="text-xl font-bold text-gray-900">
+                Patient Consultation / Treatment
+              </h2>
+              <p className="text-xs text-gray-500">
+                Patient: <span className="font-semibold text-gray-800">{selectedAppointment.clientName}</span> | Client ID: <span className="font-semibold text-gray-800">{selectedAppointment.clientId}</span>
+              </p>
+            </div>
+
+            <ConsultationForm 
+              appointmentData={selectedAppointment}
+              onClose={() => {
+                setIsConsultationOpen(false);
+                setSelectedAppointment(null);
+              }}
+              onSuccess={() => {
+                setIsConsultationOpen(false);
+                setSelectedAppointment(null);
+                fetchAppointments();
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

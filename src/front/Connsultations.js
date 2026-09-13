@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Stethoscope,
   Activity,
@@ -14,10 +14,13 @@ import {
   ShieldAlert,
   UserCheck
 } from "lucide-react";
+import api from "../services/api";
 
-const ConsultationForm = ({ appointmentId = "", patientName = "", onCancel, onSuccess }) => {
+const ConsultationForm = ({ appointmentData, onCancel, onSuccess }) => {
+    const appointmentId = appointmentData?.appointmentId;
+    const patientName = appointmentData?.patientName;
   const [formData, setFormData] = useState({
-    appointmentId: appointmentId || "59SsG61hULxspdDa3xBo",
+    appointmentId: appointmentId,
     doctor: "dan",
     chiefComplaint: "",
     associatedSymptoms: "",
@@ -33,12 +36,12 @@ const ConsultationForm = ({ appointmentId = "", patientName = "", onCancel, onSu
     plan: "",
     medications: "",
     notes: "",
-    followUpDate: null,
-    
+    followUpDate: "",
+
     // History Flags & Fields
     hasAllergies: false,
-    allergiesList: [], // Local state array for individual allergy tags
-    allergies: "",     // Serialized string representation
+    allergiesList: [],
+    allergies: "",
     hasHistory: false,
     patientHistory: "",
     familyHistory: "",
@@ -61,7 +64,14 @@ const ConsultationForm = ({ appointmentId = "", patientName = "", onCancel, onSu
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  // Handle Standard Direct Fields
+  // Sync external appointmentId prop if it changes
+  useEffect(() => {
+    if (appointmentId) {
+      setFormData((prev) => ({ ...prev, appointmentId }));
+    }
+  }, [appointmentId]);
+
+  // Handle standard top-level fields
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
@@ -70,7 +80,7 @@ const ConsultationForm = ({ appointmentId = "", patientName = "", onCancel, onSu
     }));
   };
 
-  // Handle Nested Vital Signs
+  // Handle nested vital signs
   const handleVitalChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -82,12 +92,14 @@ const ConsultationForm = ({ appointmentId = "", patientName = "", onCancel, onSu
     }));
   };
 
-  // Allergy Tag Handlers
+  // Allergy handlers
   const handleAddAllergy = (e) => {
-    e.preventDefault();
-    if (!currentAllergyInput.trim()) return;
+    if (e) e.preventDefault();
+    const trimmed = currentAllergyInput.trim();
+    
+    if (!trimmed || formData.allergiesList.includes(trimmed)) return;
 
-    const updatedList = [...formData.allergiesList, currentAllergyInput.trim()];
+    const updatedList = [...formData.allergiesList, trimmed];
     setFormData((prev) => ({
       ...prev,
       hasAllergies: true,
@@ -107,20 +119,19 @@ const ConsultationForm = ({ appointmentId = "", patientName = "", onCancel, onSu
     }));
   };
 
-  // Submit Handler
+  // Form submit handler
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccessMsg("");
 
-    if (!formData.chiefComplaint) {
+    if (!formData.chiefComplaint.trim()) {
       setError("Chief complaint is required.");
       return;
     }
 
     setLoading(true);
 
-    // Payload formatted to match your exact backend structure
     const payload = {
       appointmentId: formData.appointmentId,
       doctor: formData.doctor,
@@ -138,39 +149,29 @@ const ConsultationForm = ({ appointmentId = "", patientName = "", onCancel, onSu
       plan: formData.plan,
       medications: formData.medications,
       notes: formData.notes,
-      followUpDate: formData.followUpDate,
+      followUpDate: formData.followUpDate || null,
       hasAllergies: formData.hasAllergies,
-      allergies: formData.allergies,
+      allergies: formData.hasAllergies ? formData.allergies : "",
       hasHistory: formData.hasHistory,
-      patientHistory: formData.hasHistory ? formData.patientHistory : "null",
-      familyHistory: formData.hasHistory ? formData.familyHistory : "null",
+      patientHistory: formData.hasHistory ? formData.patientHistory : null,
+      familyHistory: formData.hasHistory ? formData.familyHistory : null,
       hasSocialHistory: formData.hasSocialHistory,
-      socialHistory: formData.socialHistory,
+      socialHistory: formData.hasSocialHistory ? formData.socialHistory : null,
       vitalSigns: formData.vitalSigns,
     };
 
     try {
       const token = localStorage.getItem("token") || sessionStorage.getItem("token");
 
-      const response = await fetch("/api/consultations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || "Failed to record consultation");
+      const response = await api.post("/clinic/consultation",formData )
+ if (response.status === 200 || response.status === 201) {
+        setSuccessMsg("Appointment scheduled successfully!");
+        setTimeout(() => {
+          if (onSuccess) onSuccess();
+        }, 1200);
       }
-
-      setSuccessMsg("Consultation recorded successfully!");
-      if (onSuccess) onSuccess(result);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "An error occurred during submission.");
     } finally {
       setLoading(false);
     }
@@ -186,7 +187,7 @@ const ConsultationForm = ({ appointmentId = "", patientName = "", onCancel, onSu
             Clinical Consultation
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Appointment ID: <span className="font-mono text-slate-700">{formData.appointmentId}</span>
+            Appointment ID: <span className="font-mono text-slate-700">{formData.appointmentId || "N/A"}</span>
             {patientName && ` | Patient: ${patientName}`}
           </p>
         </div>
@@ -331,7 +332,12 @@ const ConsultationForm = ({ appointmentId = "", patientName = "", onCancel, onSu
                     placeholder="e.g., Penicillin, Peanuts, Latex"
                     value={currentAllergyInput}
                     onChange={(e) => setCurrentAllergyInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleAddAllergy(e)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddAllergy(e);
+                      }
+                    }}
                     className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/20"
                   />
                   <button
@@ -383,7 +389,7 @@ const ConsultationForm = ({ appointmentId = "", patientName = "", onCancel, onSu
                     name="patientHistory"
                     rows={2}
                     placeholder="Patient Medical History..."
-                    value={formData.patientHistory === "null" ? "" : formData.patientHistory}
+                    value={formData.patientHistory}
                     onChange={handleChange}
                     className="w-full p-2.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   />
@@ -391,7 +397,7 @@ const ConsultationForm = ({ appointmentId = "", patientName = "", onCancel, onSu
                     name="familyHistory"
                     rows={2}
                     placeholder="Family Medical History..."
-                    value={formData.familyHistory === "null" ? "" : formData.familyHistory}
+                    value={formData.familyHistory}
                     onChange={handleChange}
                     className="w-full p-2.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   />
@@ -560,7 +566,7 @@ const ConsultationForm = ({ appointmentId = "", patientName = "", onCancel, onSu
               <input
                 type="date"
                 name="followUpDate"
-                value={formData.followUpDate || ""}
+                value={formData.followUpDate}
                 onChange={handleChange}
                 className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
