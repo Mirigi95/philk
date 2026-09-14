@@ -43,7 +43,7 @@ const PatientTreatmentHistory = ({ selectedConsultation = null,  onBack }) => {
         return;
       }
 
-      const response = await api.get(`/api/treatment/patient/${targetId}`, {
+      const response = await api.get(`/clinic/treatment/${targetId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
