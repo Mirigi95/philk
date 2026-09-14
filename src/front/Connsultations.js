@@ -19,8 +19,10 @@ import api from "../services/api";
 const ConsultationForm = ({ appointmentData, onCancel, onSuccess }) => {
     const appointmentId = appointmentData?.appointmentId;
     const patientName = appointmentData?.patientName;
+    const clientId = appointmentData?.clientId;
   const [formData, setFormData] = useState({
     appointmentId: appointmentId,
+    clientId: clientId,
     doctor: "dan",
     chiefComplaint: "",
     associatedSymptoms: "",
@@ -66,10 +68,10 @@ const ConsultationForm = ({ appointmentData, onCancel, onSuccess }) => {
 
   // Sync external appointmentId prop if it changes
   useEffect(() => {
-    if (appointmentId) {
-      setFormData((prev) => ({ ...prev, appointmentId }));
+    if (appointmentId && clientId) {
+      setFormData((prev) => ({ ...prev, appointmentId, clientId }));
     }
-  }, [appointmentId]);
+  }, [appointmentId, clientId]);
 
   // Handle standard top-level fields
   const handleChange = (e) => {
@@ -134,6 +136,7 @@ const ConsultationForm = ({ appointmentData, onCancel, onSuccess }) => {
 
     const payload = {
       appointmentId: formData.appointmentId,
+      clientId: formData.clientId,
       doctor: formData.doctor,
       chiefComplaint: formData.chiefComplaint,
       associatedSymptoms: formData.associatedSymptoms,

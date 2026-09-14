@@ -53,8 +53,15 @@ export default async function handler(req, res) {
           temperature: String(vitalSigns?.temperature || ""),
         };
 
+        // Format allergies into both raw text and an array for the UI
+        const allergiesRaw = Boolean(hasAllergies) ? String(allergies) : "";
+        const allergiesList = allergiesRaw
+          ? allergiesRaw.split(",").map((a) => a.trim()).filter(Boolean)
+          : [];
+
         const treatmentDoc = {
-          allergies: Boolean(hasAllergies) ? String(allergies) : "",
+          allergies: allergiesRaw,
+          allergiesList,
           hasAllergies: Boolean(hasAllergies),
           appointmentId: String(appointmentId),
           clientId: String(clientId),
@@ -87,31 +94,96 @@ export default async function handler(req, res) {
       }
     }
 
-    case "GET": {
-      try {
-        const { appointmentId, patientId } = req.query;
+   case "GET": {
+  try {
+    const { appointmentId, patientId, clientId, id } = req.query;
 
-        let query = treatmentCollection;
+    const targetClientId = clientId || id;
 
-        if (appointmentId) {
-          query = query.where("appointmentId", "==", appointmentId);
-        } else if (patientId) {
-          query = query.where("patientId", "==", patientId);
-        }
+    let query = treatmentCollection;
 
-        const snapshot = await query.get();
-
-        const records = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-
-        return res.status(200).json(records);
-      } catch (error) {
-        console.error("Error retrieving treatments:", error);
-        return res.status(500).json({ error: "Failed to retrieve treatment records" });
-      }
+    if (appointmentId) {
+      query = query.where("appointmentId", "==", String(appointmentId));
+    } else if (patientId) {
+      query = query.where("patientId", "==", String(patientId));
+    } else if (targetClientId) {
+      query = query.where("clientId", "==", String(targetClientId));
     }
+
+    const snapshot = await query.get();
+
+    const toISOString = (value) => {
+      if (!value) return null;
+
+      // Firestore Timestamp
+      if (typeof value.toDate === "function") {
+        return value.toDate().toISOString();
+      }
+
+      // Already a Date
+      if (value instanceof Date) {
+        return value.toISOString();
+      }
+
+      // Already a string
+      if (typeof value === "string") {
+        return value;
+      }
+
+      return null;
+    };
+
+    const records = snapshot.docs.map((doc) => {
+      const data = doc.data();
+
+      const createdAt = toISOString(data.createdAt);
+      const date = toISOString(data.date);
+      const followUpDate = toISOString(data.followUpDate);
+
+      const allergiesList = Array.isArray(data.allergiesList)
+        ? data.allergiesList
+        : data.allergies
+        ? String(data.allergies)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
+
+      return {
+        id: doc.id,
+
+        ...data,
+
+        // Always return dates as strings
+        createdAt,
+        date,
+        followUpDate,
+
+        // Always return an array
+        allergiesList,
+
+        // Ensure arrays are safe for React
+        prescription: Array.isArray(data.prescription)
+          ? data.prescription
+          : [],
+
+        tests: Array.isArray(data.tests)
+          ? data.tests.map((test) => String(test))
+          : [],
+
+        vitalSigns: data.vitalSigns || {},
+      };
+    });
+
+    return res.status(200).json({ records });
+  } catch (error) {
+    console.error("Error retrieving treatments:", error);
+
+    return res.status(500).json({
+      error: "Failed to retrieve treatment records",
+    });
+  }
+}
 
     default: {
       res.setHeader("Allow", ["GET", "POST"]);

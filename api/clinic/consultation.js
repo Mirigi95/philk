@@ -22,6 +22,7 @@ export default async function handler(req, res) {
       try {
         const {
           appointmentId = "",
+          clientId = "",
           chiefComplaint = "",
           associatedSymptoms = "",
           onset = "",
@@ -67,6 +68,7 @@ export default async function handler(req, res) {
         // Construct document payload matching your exact Firestore structure
         const consultationDoc = {
           appointmentId: String(appointmentId),
+          clientId: String(clientId),
           doctor: createdBy,
           chiefComplaint: String(chiefComplaint),
           associatedSymptoms: String(associatedSymptoms),
