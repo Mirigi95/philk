@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { 
-  signInWithEmailAndPassword, 
-  GoogleAuthProvider, 
-  signInWithPopup, 
-  sendPasswordResetEmail 
+import {
+  signInWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup,
+  sendPasswordResetEmail
 } from "firebase/auth";
 import { Eye, EyeOff, Loader2, ShieldCheck, ArrowLeft, Activity, HeartPulse, UserCheck } from "lucide-react";
 import { auth } from "../fb/init.js";
 import api from "../services/api.js";
+import logo from '../migad.png'
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -39,7 +40,7 @@ const Login = () => {
 
     // Persist user context
     sessionStorage.setItem("role", role);
-     sessionStorage.setItem("facility", facility);
+    sessionStorage.setItem("facility", facility);
     sessionStorage.setItem("clientId", clientId);
     sessionStorage.setItem("userName", name);
 
@@ -116,58 +117,86 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-white">
-      {/* LEFT SIDE: Branding Panel */}
-      <div className="hidden md:flex md:w-1/2 bg-blue-700 text-white p-12 flex-col justify-between relative overflow-hidden">
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-blue-600 opacity-50 pointer-events-none"></div>
-        <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-80 h-80 rounded-full bg-blue-800 opacity-50 pointer-events-none"></div>
+ {/* LEFT SIDE: Branding Panel */}
+<div className="hidden md:flex md:w-1/2 bg-blue-700 text-white p-12 flex-col justify-between relative overflow-hidden">
 
-        <div className="relative z-10 flex items-center gap-3">
-          <div className="bg-white/10 p-2.5 rounded-xl backdrop-blur-sm">
-            <HeartPulse className="w-8 h-8 text-blue-200" />
-          </div>
-          <span className="text-2xl font-bold tracking-tight">Migad HMS</span>
+    {/* Decorative backgrounds */}
+    <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-blue-600/50 pointer-events-none" />
+
+    <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-80 h-80 rounded-full bg-blue-800/50 pointer-events-none" />
+
+    {/* Logo */}
+    <div className="relative z-10 flex items-center">
+        <div className="bg-white/95 rounded-2xl px-6 py-4 shadow-lg">
+            <img
+                src={logo}
+                alt="Migad Clinic"
+                className="w-[480px] h-auto max-h-[100px] object-contain"
+            />
         </div>
+    </div>
 
-        <div className="relative z-10 my-auto max-w-lg">
-          <h1 className="text-4xl font-extrabold tracking-tight leading-tight mb-4">
+    {/* Main Branding Content */}
+    <div className="relative z-10 my-auto max-w-lg py-12">
+
+        <h1 className="text-4xl font-extrabold tracking-tight leading-tight mb-4">
             Streamlined Healthcare Management System
-          </h1>
-          <p className="text-blue-100 text-lg mb-8 leading-relaxed">
-            Manage patient records, schedule appointments, and coordinate care effortlessly through our unified clinical workspace.
-          </p>
+        </h1>
 
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 bg-white/10 p-3.5 rounded-lg backdrop-blur-sm">
-              <ShieldCheck className="w-5 h-5 text-blue-200 shrink-0" />
-              <span className="text-sm text-blue-50 font-medium">HIPAA-compliant data encryption & storage</span>
-            </div>
-            <div className="flex items-center gap-3 bg-white/10 p-3.5 rounded-lg backdrop-blur-sm">
-              <Activity className="w-5 h-5 text-blue-200 shrink-0" />
-              <span className="text-sm text-blue-50 font-medium">Real-time clinical workflow tracking</span>
-            </div>
-            <div className="flex items-center gap-3 bg-white/10 p-3.5 rounded-lg backdrop-blur-sm">
-              <UserCheck className="w-5 h-5 text-blue-200 shrink-0" />
-              <span className="text-sm text-blue-50 font-medium">Role-based access for staff & practitioners</span>
-            </div>
-          </div>
-        </div>
+        <p className="text-blue-100 text-lg mb-8 leading-relaxed">
+            Manage patient records, schedule appointments, and coordinate care
+            effortlessly through our unified clinical workspace.
+        </p>
 
-        <div className="relative z-10 text-xs text-blue-200">
-          © {new Date().getFullYear()} Migad Clinic Management System. All rights reserved.
+        <div className="space-y-4">
+
+            <div className="flex items-center gap-3 bg-white/10 p-3.5 rounded-lg backdrop-blur-sm">
+                <ShieldCheck className="w-5 h-5 text-blue-200 shrink-0" />
+                <span className="text-sm text-blue-50 font-medium">
+                    HIPAA-compliant data encryption & storage
+                </span>
+            </div>
+
+            <div className="flex items-center gap-3 bg-white/10 p-3.5 rounded-lg backdrop-blur-sm">
+                <Activity className="w-5 h-5 text-blue-200 shrink-0" />
+                <span className="text-sm text-blue-50 font-medium">
+                    Real-time clinical workflow tracking
+                </span>
+            </div>
+
+            <div className="flex items-center gap-3 bg-white/10 p-3.5 rounded-lg backdrop-blur-sm">
+                <UserCheck className="w-5 h-5 text-blue-200 shrink-0" />
+                <span className="text-sm text-blue-50 font-medium">
+                    Role-based access for staff & practitioners
+                </span>
+            </div>
+
         </div>
-      </div>
+    </div>
+
+    {/* Footer */}
+    <div className="relative z-10 text-xs text-blue-200">
+        © {new Date().getFullYear()} Migad Clinic Management System.
+        All rights reserved.
+    </div>
+</div>
+
 
       {/* RIGHT SIDE: Login / Reset Form */}
-      <div className="flex-1 flex items-center justify-center p-6 bg-slate-50">
+      <div className="flex-1 flex items-center justify-center p-6 bg-slate-50/50">
         <div className="w-full max-w-md">
           {/* Mobile Header Branding */}
-          <div className="md:hidden flex flex-col items-center mb-6">
-            <div className="bg-blue-600 p-3 rounded-2xl mb-2 text-white">
-              <HeartPulse className="w-8 h-8" />
+          {/* Mobile Header Branding */}
+          <div className="md:hidden flex justify-center mb-6">
+            <div className="bg-white rounded-2xl px-6 py-4 shadow-sm border border-slate-100">
+              <img
+                src={logo}
+                alt="Migad Clinic"
+                className="w-[260px] h-auto max-h-[120px] object-contain"
+              />
             </div>
-            <h2 className="text-2xl font-bold text-slate-800">Migad HMS</h2>
-            <p className="text-xs text-slate-500">Healthcare Management Portal</p>
           </div>
+
 
           <div className="bg-white p-8 rounded-2xl shadow-lg border border-slate-100">
             <div className="mb-6">
@@ -175,8 +204,8 @@ const Login = () => {
                 {isResetMode ? "Reset Password" : "Welcome Back"}
               </h2>
               <p className="text-slate-500 mt-1 text-sm">
-                {isResetMode 
-                  ? "Enter your email to receive a recovery link" 
+                {isResetMode
+                  ? "Enter your email to receive a recovery link"
                   : "Access your clinic administration portal"}
               </p>
             </div>
@@ -214,8 +243,8 @@ const Login = () => {
                     <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
                       Password
                     </label>
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => setIsResetMode(true)}
                       className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
                     >
@@ -299,10 +328,10 @@ const Login = () => {
                   disabled={loading}
                   className="w-full flex items-center justify-center gap-3 bg-white border border-slate-300 text-slate-700 py-3 rounded-lg hover:bg-slate-50 transition-all shadow-sm font-medium text-sm disabled:opacity-60"
                 >
-                  <img 
-                    src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
-                    alt="Google" 
-                    className="w-5 h-5" 
+                  <img
+                    src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                    alt="Google"
+                    className="w-5 h-5"
                   />
                   Sign in with Google
                 </button>

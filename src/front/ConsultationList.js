@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Stethoscope,
   Pill,
@@ -26,13 +26,13 @@ const ConsultationsList = ({ onSelectPrescription, onCreateNew }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  // Modal State for Treatment Form
+  // Modal State for Treatment Form & History
   const [isTreatmentModalOpen, setIsTreatmentModalOpen] = useState(false);
-   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [selectedConsultation, setSelectedConsultation] = useState(null);
 
   // Fetch Consultations from Backend
-  const fetchConsultations = async () => {
+  const fetchConsultations = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -51,53 +51,74 @@ const ConsultationsList = ({ onSelectPrescription, onCreateNew }) => {
         "An error occurred while fetching records.";
 
       setError(errorMessage);
-    }  finally {
+    } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchConsultations();
-  }, []);
+  }, [fetchConsultations]);
 
-  // Modal Open Handler
+  // Modal Handlers
   const handleOpenTreatmentModal = (consultation) => {
     setSelectedConsultation(consultation);
     setIsTreatmentModalOpen(true);
   };
-   const handleOpenHistoryModal = (consultation) => {
+
+  const handleOpenHistoryModal = (consultation) => {
     setSelectedConsultation(consultation);
     setIsHistoryModalOpen(true);
   };
 
-  // Modal Close Handler
   const handleCloseTreatmentModal = () => {
     setIsTreatmentModalOpen(false);
     setSelectedConsultation(null);
   };
+
   const handleCloseHistoryModal = () => {
     setIsHistoryModalOpen(false);
     setSelectedConsultation(null);
   };
 
-  // Handle successful form submission
+  // Callback after saving treatment or history entries
   const handleTreatmentSuccess = () => {
     handleCloseTreatmentModal();
-    fetchConsultations(); // Refresh records to update table status badges
+    fetchConsultations(); // Refetch saved updates
+  };
+
+  const handleHistorySuccess = () => {
+    handleCloseHistoryModal();
+    fetchConsultations(); // Refetch saved updates
+  };
+
+  const handlePrescribeClick = (consultation) => {
+    if (onSelectPrescription) {
+      onSelectPrescription(consultation);
+    } else {
+      handleOpenHistoryModal(consultation);
+    }
   };
 
   // Filter consultations based on search term and status
   const filteredConsultations = consultations.filter((item) => {
+    const patientName = item.patientName || item.patient?.name || "";
+    const apptId = item.appointmentId || item.id || "";
+    const diagCode = item.diagnosisCode || item.diagnosis || "";
+    const complaint = item.chiefComplaint || "";
+
     const matchesSearch =
-      (item.patientName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.appointmentId || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.diagnosisCode || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.chiefComplaint || "").toLowerCase().includes(searchTerm.toLowerCase());
+      patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      apptId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      diagCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      complaint.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const hasPlan = Boolean(item.plan || item.treatmentPlan || item.prescriptions?.length);
 
     const matchesStatus =
       statusFilter === "all" ||
-      (statusFilter === "pending" && !item.plan) ||
-      (statusFilter === "completed" && item.plan);
+      (statusFilter === "pending" && !hasPlan) ||
+      (statusFilter === "completed" && hasPlan);
 
     return matchesSearch && matchesStatus;
   });
@@ -136,9 +157,8 @@ const ConsultationsList = ({ onSelectPrescription, onCreateNew }) => {
         </div>
       </div>
 
-      {/* Search & Filter Toolbar */}
+      {/* Toolbar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-        {/* Search Input */}
         <div className="relative w-full sm:w-80">
           <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
           <input
@@ -150,42 +170,38 @@ const ConsultationsList = ({ onSelectPrescription, onCreateNew }) => {
           />
         </div>
 
-        {/* Status Pills */}
+        {/* Status Filter */}
         <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg self-start sm:self-auto text-xs font-medium">
           <button
             onClick={() => setStatusFilter("all")}
-            className={`px-3 py-1.5 rounded-md transition-all ${
-              statusFilter === "all"
+            className={`px-3 py-1.5 rounded-md transition-all ${statusFilter === "all"
                 ? "bg-white text-slate-800 shadow-xs"
                 : "text-slate-500 hover:text-slate-700"
-            }`}
+              }`}
           >
             All ({consultations.length})
           </button>
           <button
             onClick={() => setStatusFilter("pending")}
-            className={`px-3 py-1.5 rounded-md transition-all ${
-              statusFilter === "pending"
+            className={`px-3 py-1.5 rounded-md transition-all ${statusFilter === "pending"
                 ? "bg-white text-slate-800 shadow-xs"
                 : "text-slate-500 hover:text-slate-700"
-            }`}
+              }`}
           >
             Pending Plan
           </button>
           <button
             onClick={() => setStatusFilter("completed")}
-            className={`px-3 py-1.5 rounded-md transition-all ${
-              statusFilter === "completed"
+            className={`px-3 py-1.5 rounded-md transition-all ${statusFilter === "completed"
                 ? "bg-white text-slate-800 shadow-xs"
                 : "text-slate-500 hover:text-slate-700"
-            }`}
+              }`}
           >
             Completed
           </button>
         </div>
       </div>
 
-      {/* Error Message */}
       {error && (
         <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2">
           <AlertCircle size={18} />
@@ -193,7 +209,7 @@ const ConsultationsList = ({ onSelectPrescription, onCreateNew }) => {
         </div>
       )}
 
-      {/* Consultation Table */}
+      {/* Table */}
       <div className="overflow-x-auto border border-slate-200 rounded-xl">
         <table className="w-full text-left text-xs">
           <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider">
@@ -201,6 +217,7 @@ const ConsultationsList = ({ onSelectPrescription, onCreateNew }) => {
               <th className="px-4 py-3">Appt / Patient</th>
               <th className="px-4 py-3">Chief Complaint</th>
               <th className="px-4 py-3">Diagnosis</th>
+              <th className="px-4 py-3">Tests</th>
               <th className="px-4 py-3">Vitals</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3 text-right">Actions</th>
@@ -221,91 +238,102 @@ const ConsultationsList = ({ onSelectPrescription, onCreateNew }) => {
                 </td>
               </tr>
             ) : (
-              filteredConsultations.map((item) => (
-                <tr key={item.id || item.appointmentId} className="hover:bg-slate-50/80 transition-colors">
-                  {/* Appointment & Patient Info */}
-                  <td className="px-4 py-3">
-                    <div className="font-semibold text-slate-800 flex items-center gap-1.5">
-                      <User size={13} className="text-slate-400" />
-                      {item.patientName || "Unknown Patient"}
-                    </div>
-                    <div className="text-[11px] font-mono text-slate-400 mt-0.5">
-                      ID: {item.appointmentId || "N/A"}
-                    </div>
-                  </td>
+              filteredConsultations.map((item) => {
+                const hasPlan = Boolean(item.plan || item.treatmentPlan || item.prescriptions?.length);
 
-                  {/* Chief Complaint */}
-                  <td className="px-4 py-3 max-w-xs truncate" title={item.chiefComplaint}>
-                    <span className="font-medium text-slate-800">{item.chiefComplaint || "—"}</span>
-                    {item.associatedSymptoms && (
-                      <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                        Sx: {item.associatedSymptoms}
-                      </p>
-                    )}
-                  </td>
-
-                  {/* Diagnosis */}
-                  <td className="px-4 py-3">
-                    {item.diagnosisCode ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-semibold text-[11px] border border-blue-100">
-                        {item.diagnosisCode}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400 italic">Pending</span>
-                    )}
-                  </td>
-
-                  {/* Vitals Summary */}
-                  <td className="px-4 py-3">
-                    {item.vitalSigns ? (
-                      <div className="space-y-0.5 text-[11px] text-slate-600">
-                        <div>BP: {item.vitalSigns.bloodPressure || "—"}</div>
-                        <div>HR: {item.vitalSigns.pulse ? `${item.vitalSigns.pulse} bpm` : "—"}</div>
+                return (
+                  <tr key={item.id || item.appointmentId} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                        <User size={13} className="text-slate-400" />
+                        {item.patientName || item.patient?.name || "Unknown Patient"}
                       </div>
-                    ) : (
-                      <span className="text-slate-400">—</span>
-                    )}
-                  </td>
+                      <div className="text-[11px] font-mono text-slate-400 mt-0.5">
+                        ID: {item.appointmentId || item.id || "N/A"}
+                      </div>
+                    </td>
 
-                  {/* Status Badge */}
-                  <td className="px-4 py-3">
-                    {item.plan ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-semibold border border-emerald-200">
-                        <CheckCircle2 size={12} /> Complete
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[11px] font-semibold border border-amber-200">
-                        <Clock size={12} /> Pending Plan
-                      </span>
-                    )}
-                  </td>
+                    <td className="px-4 py-3 max-w-xs truncate" title={item.chiefComplaint}>
+                      <span className="font-medium text-slate-800">{item.chiefComplaint || "—"}</span>
+                      {item.associatedSymptoms && (
+                        <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                          Sx: {item.associatedSymptoms}
+                        </p>
+                      )}
+                    </td>
 
-                  {/* Action Buttons */}
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {/* Treatment Button triggers Modal */}
-                      <button
-                        onClick={() => handleOpenTreatmentModal(item)}
-                        className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-[11px] flex items-center gap-1 transition-colors border border-blue-200"
-                        title="Edit / Add Treatment Plan"
-                      >
-                        <FileText size={13} />
-                        Treatment
-                      </button>
+                    <td className="px-4 py-3">
+                      {item.diagnosisCode || item.diagnosis ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-semibold text-[11px] border border-blue-100">
+                          {item.diagnosisCode || item.diagnosis}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 italic">Pending</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {Array.isArray(item.tests) && item.tests.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {item.tests.map((test, index) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-semibold text-[11px] border border-blue-100 capitalize"
+                            >
+                              {test}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 italic">Pending</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {item.vitalSigns ? (
+                        <div className="space-y-0.5 text-[11px] text-slate-600">
+                          <div>BP: {item.vitalSigns.bloodPressure || "—"}</div>
+                          <div>HR: {item.vitalSigns.pulse ? `${item.vitalSigns.pulse} bpm` : "—"}</div>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
 
-                      {/* Prescription Action Button */}
-                      <button
-                        onClick={() => handleOpenHistoryModal(item,)}
-                        className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] flex items-center gap-1 transition-colors shadow-xs"
-                        title="Issue Prescription"
-                      >
-                        <Pill size={13} />
-                        Prescribe
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    <td className="px-4 py-3">
+                      {hasPlan ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-semibold border border-emerald-200">
+                          <CheckCircle2 size={12} /> Complete
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[11px] font-semibold border border-amber-200">
+                          <Clock size={12} /> Pending Plan
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleOpenTreatmentModal(item)}
+                          className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-[11px] flex items-center gap-1 transition-colors border border-blue-200"
+                          title="Edit / Add Treatment Plan"
+                        >
+                          <FileText size={13} />
+                          Treatment
+                        </button>
+
+                        <button
+                          onClick={() => handlePrescribeClick(item)}
+                          className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] flex items-center gap-1 transition-colors shadow-xs"
+                          title="Issue Prescription / View History"
+                        >
+                          <Pill size={13} />
+                          Prescribe
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -315,7 +343,6 @@ const ConsultationsList = ({ onSelectPrescription, onCreateNew }) => {
       {isTreatmentModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
           <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto my-auto">
-            {/* Modal Sticky Close Header */}
             <div className="sticky top-0 right-0 z-10 flex justify-end p-4 bg-white/80 backdrop-blur-xs rounded-t-2xl border-b border-slate-100">
               <button
                 onClick={handleCloseTreatmentModal}
@@ -326,7 +353,6 @@ const ConsultationsList = ({ onSelectPrescription, onCreateNew }) => {
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="p-4 md:p-6 pt-0">
               <TreatmentForm
                 selectedConsultation={selectedConsultation}
@@ -337,10 +363,11 @@ const ConsultationsList = ({ onSelectPrescription, onCreateNew }) => {
           </div>
         </div>
       )}
-            {isHistoryModalOpen && (
+
+      {/* Patient Treatment History Modal */}
+      {isHistoryModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
           <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto my-auto">
-            {/* Modal Sticky Close Header */}
             <div className="sticky top-0 right-0 z-10 flex justify-end p-4 bg-white/80 backdrop-blur-xs rounded-t-2xl border-b border-slate-100">
               <button
                 onClick={handleCloseHistoryModal}
@@ -351,11 +378,10 @@ const ConsultationsList = ({ onSelectPrescription, onCreateNew }) => {
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="p-4 md:p-6 pt-0">
               <PatientTreatmentHistory
                 selectedConsultation={selectedConsultation}
-                //onSuccess={handleHistorySuccess}
+                onSuccess={handleHistorySuccess}
                 onCancel={handleCloseHistoryModal}
               />
             </div>

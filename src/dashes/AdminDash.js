@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, Outlet, useNavigate } from "react-router-dom";
+import { Link, Outlet, useNavigate, useLocation, useOutlet } from "react-router-dom";
 import {
   Users,
   Calendar,
@@ -22,6 +22,10 @@ import {
   Sparkles,
   ChevronRight,
   Building2,
+  LayoutDashboard,
+  History,
+  FlaskConical,
+  Menu,
 } from "lucide-react";
 
 import AppointmentForm from "../front/NewAppointment";
@@ -29,6 +33,8 @@ import Appointments from "../front/Appointments";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const outlet = useOutlet();
 
   const name =
     sessionStorage.getItem("userName") ||
@@ -48,6 +54,7 @@ export default function AdminDashboard() {
   const [userName, setUserName] = useState(name);
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [statsData, setStatsData] = useState({
     totalPatients: 0,
@@ -147,6 +154,34 @@ export default function AdminDashboard() {
     }
   };
 
+  const navigationItems = [
+    {
+      group: "Overview",
+      items: [
+        { label: "Dashboard", route: "/admin", icon: LayoutDashboard },
+        { label: "Appointments", route: "/admin/appointment", icon: Calendar },
+      ],
+    },
+    {
+      group: "Clinical",
+      items: [
+        { label: "New Consultation", route: "/admin/consult", icon: Stethoscope },
+        { label: "Consultation List", route: "/admin/constlist", icon: ClipboardList },
+        { label: "Treatment History", route: "/admin/history", icon: History },
+        { label: "Lab Tests", route: "/admin/labtest", icon: FlaskConical },
+      ],
+    },
+    {
+      group: "Management",
+      items: [
+        { label: "Patients", route: "/admin/list", icon: Users },
+        { label: "Doctors", route: "/admin/doctors", icon: Stethoscope },
+        { label: "Prescriptions", route: "/admin/prescriptions", icon: Pill },
+        { label: "Settings", route: "/admin/settings", icon: Settings },
+      ],
+    },
+  ];
+
   const setupTasks = [
     {
       id: 1,
@@ -182,7 +217,6 @@ export default function AdminDashboard() {
       icon: Users,
       color: "text-blue-600",
       bg: "bg-blue-50",
-      iconBg: "bg-blue-100",
       accent: "from-blue-500 to-cyan-500",
     },
     {
@@ -192,7 +226,6 @@ export default function AdminDashboard() {
       icon: Calendar,
       color: "text-emerald-600",
       bg: "bg-emerald-50",
-      iconBg: "bg-emerald-100",
       accent: "from-emerald-500 to-teal-500",
     },
     {
@@ -202,7 +235,6 @@ export default function AdminDashboard() {
       icon: Stethoscope,
       color: "text-violet-600",
       bg: "bg-violet-50",
-      iconBg: "bg-violet-100",
       accent: "from-violet-500 to-purple-500",
     },
     {
@@ -212,7 +244,6 @@ export default function AdminDashboard() {
       icon: Pill,
       color: "text-amber-600",
       bg: "bg-amber-50",
-      iconBg: "bg-amber-100",
       accent: "from-amber-500 to-orange-500",
     },
   ];
@@ -242,14 +273,6 @@ export default function AdminDashboard() {
       color: "bg-violet-600",
       hover: "hover:bg-violet-700",
     },
-     {
-      title: "Consultation List",
-      description: "view consultation",
-      icon: Stethoscope,
-      action: () => navigate("/admin/constlist"),
-      color: "bg-violet-600",
-      hover: "hover:bg-violet-700",
-    },
     {
       title: "View Patients",
       description: "Manage patient records",
@@ -258,63 +281,101 @@ export default function AdminDashboard() {
       color: "bg-slate-800",
       hover: "hover:bg-slate-900",
     },
-     {
-      title: "Treatment History",
-      description: "Manage patient records",
-      icon: Users,
-      action: () => navigate("/admin/history"),
-      color: "bg-slate-800",
-      hover: "hover:bg-slate-900",
-    },
   ];
 
   return (
-    <div className="min-h-screen bg-[#f6f8fb] text-slate-900">
-      {/* Decorative background */}
+    <div className="min-h-screen bg-[#f6f8fb] text-slate-900 flex flex-col md:flex-row">
+      {/* Decorative background blur */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-40 -right-40 h-96 w-96 rounded-full bg-blue-100/40 blur-3xl" />
         <div className="absolute top-[45%] -left-40 h-96 w-96 rounded-full bg-cyan-100/30 blur-3xl" />
       </div>
 
-      <main className="relative max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8">
-        {/* =====================================================
-            TOP BAR
-        ====================================================== */}
-        <div className="mb-7 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <Building2 className="text-white" size={24} />
-            </div>
+      {/* SIDEBAR NAVIGATION */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
 
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+      <aside
+        className={`fixed md:sticky top-0 left-0 h-screen w-64 bg-white border-r border-slate-200/80 flex flex-col justify-between z-50 transition-transform duration-300 ease-in-out shrink-0 ${
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        }`}
+      >
+        <div className="p-5 overflow-y-auto flex-1">
+          <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center shadow-md shadow-blue-500/20">
+                <Building2 className="text-white" size={20} />
+              </div>
+              <div className="leading-tight">
+                <h1 className="font-bold text-slate-900 text-base truncate max-w-[130px]">
                   {facility}
                 </h1>
-
-                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-[10px] font-bold uppercase tracking-wider text-emerald-600">
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  System Online
+                  Online
                 </span>
               </div>
-
-              <p className="text-sm text-slate-500 mt-0.5">
-                Management &amp; Operations Portal
-              </p>
             </div>
+
+            <button
+              className="md:hidden p-1.5 text-slate-400 hover:text-slate-600 rounded-lg"
+              onClick={() => setIsSidebarOpen(false)}
+            >
+              <X size={18} />
+            </button>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-3 px-3 py-2 bg-white border border-slate-200 rounded-xl shadow-sm">
-              <div className="h-9 w-9 rounded-lg bg-blue-50 flex items-center justify-center">
-                <Shield size={17} className="text-blue-600" />
-              </div>
+          <nav className="space-y-6">
+            {navigationItems.map((group) => (
+              <div key={group.group}>
+                <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  {group.group}
+                </p>
+                <div className="space-y-1">
+                  {group.items.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = location.pathname === item.route;
 
-              <div className="leading-tight">
-                <p className="text-xs font-bold text-slate-800">
+                    return (
+                      <Link
+                        key={item.label}
+                        to={item.route}
+                        onClick={() => setIsSidebarOpen(false)}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                          isActive
+                            ? "bg-blue-50 text-blue-600 border border-blue-100 shadow-sm"
+                            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                        }`}
+                      >
+                        <Icon
+                          size={17}
+                          className={isActive ? "text-blue-600" : "text-slate-400"}
+                        />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </nav>
+        </div>
+
+        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-lg bg-blue-100/70 border border-blue-200/50 flex items-center justify-center shrink-0">
+                <Shield size={16} className="text-blue-600" />
+              </div>
+              <div className="leading-tight truncate max-w-[100px]">
+                <p className="text-xs font-bold text-slate-800 truncate">
                   {userName}
                 </p>
-                <p className="text-[10px] text-slate-400 capitalize">
+                <p className="text-[10px] text-slate-400 capitalize truncate">
                   {role}
                 </p>
               </div>
@@ -322,400 +383,230 @@ export default function AdminDashboard() {
 
             <button
               onClick={handleLogout}
-              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-red-600 hover:border-red-100 hover:bg-red-50 transition-all text-sm font-medium shadow-sm"
+              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              title="Logout"
             >
               <LogOut size={16} />
-              <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
         </div>
+      </aside>
 
-        {/* =====================================================
-            WELCOME HERO
-        ====================================================== */}
-        <section className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0f2d5c] via-[#124b8c] to-[#087f9d] shadow-xl shadow-blue-900/10 mb-7">
-          {/* Decorative circles */}
-          <div className="absolute -right-20 -top-24 w-80 h-80 rounded-full border-[40px] border-white/5" />
-          <div className="absolute right-32 -bottom-32 w-72 h-72 rounded-full border-[30px] border-white/5" />
-          <div className="absolute right-[30%] top-8 w-3 h-3 rounded-full bg-cyan-300/40" />
-          <div className="absolute right-[20%] bottom-10 w-2 h-2 rounded-full bg-white/30" />
-
-          <div className="relative px-6 sm:px-8 lg:px-10 py-7 sm:py-9">
-            <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/10 text-blue-100 text-xs font-medium mb-4 backdrop-blur">
-                <Sparkles size={13} />
-                Healthcare Management Dashboard
-              </div>
-
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white tracking-tight">
-                Welcome back, {userName}
-              </h2>
-
-              <p className="mt-2 text-sm sm:text-base text-blue-100/80 max-w-xl leading-relaxed">
-                Here's what's happening across your clinic today. Manage
-                patients, appointments and clinical operations from one place.
-              </p>
-
-              <div className="mt-6 flex flex-wrap gap-3">
-                <button
-                  onClick={() => handleOpenAppointmentForm()}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-blue-700 font-semibold text-sm shadow-lg hover:bg-blue-50 transition-all"
-                >
-                  <Plus size={17} strokeWidth={2.5} />
-                  New Appointment
-                </button>
-
-                <button
-                  onClick={() => navigate("/admin/appointment")}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 border border-white/15 text-white font-semibold text-sm hover:bg-white/15 transition-all backdrop-blur"
-                >
-                  <Calendar size={17} />
-                  View Appointments
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* =====================================================
-            STATS
-        ====================================================== */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-7">
-          {stats.map((item, index) => {
-            const Icon = item.icon;
-
-            return (
-              <div
-                key={index}
-                className="group relative overflow-hidden bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
-              >
-                <div
-                  className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${item.accent}`}
-                />
-
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.12em]">
-                      {item.title}
-                    </p>
-
-                    <div className="mt-2 flex items-baseline gap-2">
-                      <h3 className="text-3xl font-bold tracking-tight text-slate-900">
-                        {loading ? (
-                          <Loader2
-                            size={25}
-                            className="animate-spin text-slate-300"
-                          />
-                        ) : (
-                          item.value
-                        )}
-                      </h3>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 mt-2">
-                      <TrendingUp
-                        size={13}
-                        className="text-emerald-500"
-                      />
-                      <span className="text-xs text-slate-500">
-                        {item.description}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div
-                    className={`h-12 w-12 rounded-xl ${item.bg} flex items-center justify-center`}
-                  >
-                    <Icon size={21} className={item.color} />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </section>
-
-        {/* =====================================================
-            QUICK ACTIONS
-        ====================================================== */}
-        <section className="mb-7">
-          <div className="flex items-center justify-between mb-4">
+      {/* MAIN CONTENT AREA */}
+      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
+        {/* Top Header */}
+        <header className="bg-white/80 backdrop-blur-md sticky top-0 z-30 border-b border-slate-200/80 px-4 sm:px-8 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-xl"
+            >
+              <Menu size={20} />
+            </button>
             <div>
               <h2 className="text-lg font-bold text-slate-900">
-                Quick Actions
+                Welcome back, {userName}
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Frequently used clinic operations
+              <p className="text-xs text-slate-500">
+                Here is an overview of {facility}'s operational status today.
               </p>
             </div>
           </div>
+        </header>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {quickActions.map((action, index) => {
-              const Icon = action.icon;
-
-              return (
-                <button
-                  key={index}
-                  onClick={action.action}
-                  className="group bg-white border border-slate-200/80 rounded-2xl p-4 text-left shadow-sm hover:shadow-md hover:border-slate-300 transition-all"
-                >
-                  <div className="flex items-center justify-between">
-                    <div
-                      className={`h-10 w-10 rounded-xl ${action.color} ${action.hover} flex items-center justify-center text-white shadow-sm transition-colors`}
-                    >
-                      <Icon size={19} />
-                    </div>
-
-                    <ChevronRight
-                      size={17}
-                      className="text-slate-300 group-hover:text-slate-600 group-hover:translate-x-0.5 transition-all"
-                    />
-                  </div>
-
-                  <h3 className="mt-4 text-sm font-bold text-slate-800">
-                    {action.title}
-                  </h3>
-
-                  <p className="text-xs text-slate-400 mt-1">
-                    {action.description}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* =====================================================
-            MAIN CONTENT
-        ====================================================== */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* =================================================
-              APPOINTMENTS
-          ================================================== */}
-          <section className="xl:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div className="px-5 sm:px-6 py-5 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center">
-                    <Calendar size={16} className="text-blue-600" />
-                  </div>
-
-                  <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                    Recent Appointments
-                  </h2>
-                </div>
-
-                <p className="text-xs text-slate-400 mt-1 ml-10">
-                  Latest scheduled consultations
-                </p>
-              </div>
-
-              <Link
-                to="/admin/appointment"
-                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-blue-600 hover:text-blue-700"
-              >
-                View all
-                <ArrowRight size={15} />
-              </Link>
-            </div>
-
-            <div className="p-3 sm:p-5">
-              <Appointments />
-            </div>
-          </section>
-
-          {/* =================================================
-              RIGHT COLUMN
-          ================================================== */}
-          <div className="space-y-6">
-            {/* Setup Checklist */}
-            <section className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-              <div className="px-5 py-5 border-b border-slate-100">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-base font-bold text-slate-900">
-                      Clinic Setup
-                    </h2>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Complete your configuration
-                    </p>
-                  </div>
-
-                  <div className="h-9 w-9 rounded-xl bg-blue-50 flex items-center justify-center">
-                    <Settings size={17} className="text-blue-600" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 space-y-2">
-                {setupTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className={`group flex items-center justify-between gap-3 p-3 rounded-xl border transition-all ${
-                      task.completed
-                        ? "bg-emerald-50/60 border-emerald-100"
-                        : "bg-slate-50/70 border-slate-100 hover:bg-blue-50/50 hover:border-blue-100"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      {task.completed ? (
-                        <CheckCircle2
-                          size={18}
-                          className="text-emerald-500 shrink-0"
-                        />
-                      ) : (
-                        <Circle
-                          size={18}
-                          className="text-slate-300 shrink-0"
-                        />
-                      )}
-
-                      <span
-                        className={`text-xs sm:text-sm font-medium ${
-                          task.completed
-                            ? "line-through text-slate-400"
-                            : "text-slate-700"
-                        }`}
-                      >
-                        {task.title}
-                      </span>
-                    </div>
-
-                    {!task.completed && (
-                      <Link
-                        to={task.route}
-                        className="text-[11px] font-bold text-blue-600 hover:text-blue-700 whitespace-nowrap"
-                      >
-                        Setup
-                      </Link>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {/* System Overview */}
-            <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl shadow-lg p-5 text-white">
-              <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-blue-500/10" />
-
-              <div className="relative">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Activity size={17} className="text-cyan-400" />
-                    <h2 className="text-sm font-bold">
-                      Clinic Overview
-                    </h2>
-                  </div>
-
-                  <span className="text-[10px] px-2 py-1 rounded-full bg-emerald-400/10 text-emerald-300 border border-emerald-400/10">
-                    Healthy
-                  </span>
-                </div>
-
-                <div className="mt-5 grid grid-cols-2 gap-3">
-                  <div className="rounded-xl bg-white/5 border border-white/5 p-3">
-                    <div className="flex items-center gap-2 text-slate-400">
-                      <Clock3 size={14} />
-                      <span className="text-[10px] uppercase tracking-wider">
-                        Status
-                      </span>
-                    </div>
-
-                    <p className="mt-2 text-sm font-semibold">
-                      Operational
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl bg-white/5 border border-white/5 p-3">
-                    <div className="flex items-center gap-2 text-slate-400">
-                      <ClipboardList size={14} />
-                      <span className="text-[10px] uppercase tracking-wider">
-                        Tasks
-                      </span>
-                    </div>
-
-                    <p className="mt-2 text-sm font-semibold">
-                      {setupTasks.filter((task) => !task.completed).length}{" "}
-                      remaining
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* Navigation */}
-            <section className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-100">
-                <h2 className="text-sm font-bold text-slate-900">
-                  Management
-                </h2>
-              </div>
-
-              <div className="p-3 grid grid-cols-2 gap-2">
-                {[
-                  {
-                    label: "Doctors",
-                    icon: Stethoscope,
-                    route: "/admin/doctors",
-                  },
-                  {
-                    label: "Patients",
-                    icon: Users,
-                    route: "/admin/patients",
-                  },
-                  {
-                    label: "Prescriptions",
-                    icon: Pill,
-                    route: "/admin/prescriptions",
-                  },
-                  {
-                    label: "Security",
-                    icon: Shield,
-                    route: "/admin/settings",
-                  },
-                ].map((item) => {
+        {/* Content View */}
+        <main className="p-4 sm:p-8 flex-1 space-y-8">
+          {outlet ? (
+            outlet
+          ) : (
+            <>
+              {/* Stats Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {stats.map((item, idx) => {
                   const Icon = item.icon;
-
                   return (
-                    <Link
-                      key={item.label}
-                      to={item.route}
-                      className="group flex items-center gap-2.5 p-3 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-blue-50 hover:border-blue-100 transition-all"
+                    <div
+                      key={idx}
+                      className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden"
                     >
-                      <div className="h-8 w-8 rounded-lg bg-white border border-slate-100 flex items-center justify-center group-hover:bg-blue-100 group-hover:border-blue-100">
-                        <Icon
-                          size={15}
-                          className="text-slate-500 group-hover:text-blue-600"
-                        />
+                      <div
+                        className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${item.accent}`}
+                      />
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-xs font-medium text-slate-500 mb-1">
+                            {item.title}
+                          </p>
+                          <h3 className="text-2xl font-bold text-slate-900">
+                            {loading ? (
+                              <Loader2 className="animate-spin text-slate-400" size={20} />
+                            ) : (
+                              item.value
+                            )}
+                          </h3>
+                        </div>
+                        <div
+                          className={`p-3 rounded-xl ${item.bg} ${item.color}`}
+                        >
+                          <Icon size={20} />
+                        </div>
                       </div>
-
-                      <span className="text-xs font-semibold text-slate-700 group-hover:text-blue-700">
-                        {item.label}
-                      </span>
-                    </Link>
+                      <p className="text-[11px] text-slate-400 mt-3 flex items-center gap-1">
+                        <TrendingUp size={12} className="text-emerald-500" />
+                        {item.description}
+                      </p>
+                    </div>
                   );
                 })}
               </div>
-            </section>
-          </div>
-        </div>
-      </main>
 
-      {/* =====================================================
-          APPOINTMENT MODAL
-      ====================================================== */}
+              {/* Quick Actions Grid */}
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3">
+                  Quick Actions
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {quickActions.map((qa, idx) => {
+                    const Icon = qa.icon;
+                    return (
+                      <button
+                        key={idx}
+                        onClick={qa.action}
+                        className={`${qa.color} ${qa.hover} text-white p-4 rounded-2xl shadow-sm text-left transition-all flex items-center justify-between group`}
+                      >
+                        <div>
+                          <p className="font-bold text-sm">{qa.title}</p>
+                          <p className="text-xs text-white/80">
+                            {qa.description}
+                          </p>
+                        </div>
+                        <div className="p-2 bg-white/10 rounded-xl group-hover:scale-110 transition-transform">
+                          <Icon size={18} />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Setup Tasks & Appointments Section */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Onboarding / Setup Tasks */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                      <Sparkles size={16} className="text-amber-500" />
+                      Clinic Setup Checklist
+                    </h3>
+                    <span className="text-xs font-semibold text-slate-400">
+                      2/4 Done
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {setupTasks.map((task) => (
+                      <div
+                        key={task.id}
+                        onClick={() => navigate(task.route)}
+                        className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          {task.completed ? (
+                            <CheckCircle2
+                              size={18}
+                              className="text-emerald-500 shrink-0"
+                            />
+                          ) : (
+                            <Circle
+                              size={18}
+                              className="text-slate-300 shrink-0"
+                            />
+                          )}
+                          <span
+                            className={`text-xs font-medium ${
+                              task.completed
+                                ? "line-through text-slate-400"
+                                : "text-slate-700"
+                            }`}
+                          >
+                            {task.title}
+                          </span>
+                        </div>
+                        <ChevronRight size={14} className="text-slate-400" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Recent Appointments */}
+                <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                      <Clock3 size={16} className="text-blue-600" />
+                      Recent Appointments
+                    </h3>
+                    <Link
+                      to="/admin/appointment"
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                    >
+                      View All <ArrowRight size={12} />
+                    </Link>
+                  </div>
+
+                  {loading ? (
+                    <div className="flex justify-center p-8">
+                      <Loader2 className="animate-spin text-slate-400" size={24} />
+                    </div>
+                  ) : appointments.length === 0 ? (
+                    <p className="text-xs text-slate-400 text-center py-8">
+                      No recent appointments found.
+                    </p>
+                  ) : (
+                    <div className="divide-y divide-slate-100">
+                      {appointments.map((appt, i) => (
+                        <div
+                          key={appt._id || i}
+                          className="py-3 flex items-center justify-between hover:bg-slate-50/50 px-2 rounded-xl transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
+                              {appt.clientName?.[0] || "P"}
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold text-slate-800">
+                                {appt.clientName || "Unnamed Patient"}
+                              </p>
+                              <p className="text-[10px] text-slate-400">
+                                {appt.date || "Today"} • {appt.time || "Scheduled"}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-100">
+                            {appt.status || "Confirmed"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </main>
+      </div>
+
+      {/* APPOINTMENT MODAL */}
       {view === "add-appointment" && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
           <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-2xl relative overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            {/* Modal top accent */}
             <div className="h-1.5 bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-500" />
 
             <button
               onClick={handleCloseAppointmentForm}
-              className="absolute top-4 right-4 p-2.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors z-10"
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors z-10"
               aria-label="Close appointment form"
             >
-              <X size={19} />
+              <X size={18} />
             </button>
 
             <div className="p-1 sm:p-2">
@@ -728,8 +619,6 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
-
-      <Outlet />
     </div>
   );
 }

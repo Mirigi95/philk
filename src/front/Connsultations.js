@@ -7,29 +7,29 @@ import {
   Save,
   Plus,
   X,
-  Clock,
-  Heart,
   Thermometer,
+  Heart,
   Wind,
   ShieldAlert,
-  UserCheck
+  UserCheck,
+  FlaskConical, // Added missing icon
 } from "lucide-react";
 import api from "../services/api";
 
 const ConsultationForm = ({ appointmentData, onCancel, onSuccess }) => {
-    const appointmentId = appointmentData?.appointmentId;
-    const patientName = appointmentData?.patientName;
-    const clientId = appointmentData?.clientId;
+  const appointmentId = appointmentData?.appointmentId;
+  const patientName = appointmentData?.patientName;
+  const clientId = appointmentData?.clientId;
+
   const [formData, setFormData] = useState({
-    appointmentId: appointmentId,
-    clientId: clientId,
+    appointmentId: appointmentId || "",
+    clientId: clientId || "",
     doctor: "dan",
     chiefComplaint: "",
     associatedSymptoms: "",
     onset: "",
     duration: "",
     severity: "",
-    treatmentTried: "",
     historyOfIllness: "",
     reviewOfSystems: "",
     physicalExam: "",
@@ -39,6 +39,7 @@ const ConsultationForm = ({ appointmentData, onCancel, onSuccess }) => {
     medications: "",
     notes: "",
     followUpDate: "",
+    tests: [], // Added missing array field
 
     // History Flags & Fields
     hasAllergies: false,
@@ -62,18 +63,23 @@ const ConsultationForm = ({ appointmentData, onCancel, onSuccess }) => {
   });
 
   const [currentAllergyInput, setCurrentAllergyInput] = useState("");
+  const [currentTestInput, setCurrentTestInput] = useState(""); // Added missing state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  // Sync external appointmentId prop if it changes
+  // Sync external props if they change
   useEffect(() => {
-    if (appointmentId && clientId) {
-      setFormData((prev) => ({ ...prev, appointmentId, clientId }));
+    if (appointmentId || clientId) {
+      setFormData((prev) => ({
+        ...prev,
+        appointmentId: appointmentId || prev.appointmentId,
+        clientId: clientId || prev.clientId,
+      }));
     }
   }, [appointmentId, clientId]);
 
-  // Handle standard top-level fields
+  // Top-level input change handler
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
@@ -82,7 +88,29 @@ const ConsultationForm = ({ appointmentData, onCancel, onSuccess }) => {
     }));
   };
 
-  // Handle nested vital signs
+  // Lab Tests Management
+  const handleAddTest = (e) => {
+    if (e) e.preventDefault();
+    const trimmed = currentTestInput.trim();
+    if (!trimmed) return;
+
+    if (!formData.tests.includes(trimmed)) {
+      setFormData((prev) => ({
+        ...prev,
+        tests: [...prev.tests, trimmed],
+      }));
+    }
+    setCurrentTestInput("");
+  };
+
+  const handleRemoveTest = (idx) => {
+    setFormData((prev) => ({
+      ...prev,
+      tests: prev.tests.filter((_, i) => i !== idx),
+    }));
+  };
+
+  // Nested Vital Signs Handler
   const handleVitalChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -94,11 +122,11 @@ const ConsultationForm = ({ appointmentData, onCancel, onSuccess }) => {
     }));
   };
 
-  // Allergy handlers
+  // Allergy Handlers
   const handleAddAllergy = (e) => {
     if (e) e.preventDefault();
     const trimmed = currentAllergyInput.trim();
-    
+
     if (!trimmed || formData.allergiesList.includes(trimmed)) return;
 
     const updatedList = [...formData.allergiesList, trimmed];
@@ -121,7 +149,7 @@ const ConsultationForm = ({ appointmentData, onCancel, onSuccess }) => {
     }));
   };
 
-  // Form submit handler
+  // Form Submit Handler
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -135,46 +163,25 @@ const ConsultationForm = ({ appointmentData, onCancel, onSuccess }) => {
     setLoading(true);
 
     const payload = {
-      appointmentId: formData.appointmentId,
-      clientId: formData.clientId,
-      doctor: formData.doctor,
-      chiefComplaint: formData.chiefComplaint,
-      associatedSymptoms: formData.associatedSymptoms,
-      onset: formData.onset,
-      duration: formData.duration,
-      severity: formData.severity,
-      treatmentTried: formData.treatmentTried,
-      historyOfIllness: formData.historyOfIllness,
-      reviewOfSystems: formData.reviewOfSystems,
-      physicalExam: formData.physicalExam,
-      assessment: formData.assessment,
-      diagnosisCode: formData.diagnosisCode,
-      plan: formData.plan,
-      medications: formData.medications,
-      notes: formData.notes,
-      followUpDate: formData.followUpDate || null,
-      hasAllergies: formData.hasAllergies,
+      ...formData,
       allergies: formData.hasAllergies ? formData.allergies : "",
-      hasHistory: formData.hasHistory,
       patientHistory: formData.hasHistory ? formData.patientHistory : null,
       familyHistory: formData.hasHistory ? formData.familyHistory : null,
-      hasSocialHistory: formData.hasSocialHistory,
       socialHistory: formData.hasSocialHistory ? formData.socialHistory : null,
-      vitalSigns: formData.vitalSigns,
+      followUpDate: formData.followUpDate || null,
     };
 
     try {
-      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+      const response = await api.post("/clinic/consultation", payload);
 
-      const response = await api.post("/clinic/consultation",formData )
- if (response.status === 200 || response.status === 201) {
-        setSuccessMsg("Appointment scheduled successfully!");
+      if (response.status === 200 || response.status === 201) {
+        setSuccessMsg("Consultation recorded successfully!");
         setTimeout(() => {
           if (onSuccess) onSuccess();
         }, 1200);
       }
     } catch (err) {
-      setError(err.message || "An error occurred during submission.");
+      setError(err.response?.data?.message || err.message || "An error occurred during submission.");
     } finally {
       setLoading(false);
     }
@@ -246,7 +253,7 @@ const ConsultationForm = ({ appointmentData, onCancel, onSuccess }) => {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1 flex items-center gap-1">
+              <label className=" text-xs font-medium text-slate-600 mb-1 flex items-center gap-1">
                 <Heart size={12} className="text-pink-500" /> Pulse (bpm)
               </label>
               <input
@@ -259,7 +266,7 @@ const ConsultationForm = ({ appointmentData, onCancel, onSuccess }) => {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1 flex items-center gap-1">
+              <label className=" text-xs font-medium text-slate-600 mb-1 flex items-center gap-1">
                 <Wind size={12} className="text-blue-500" /> Resp Rate
               </label>
               <input
@@ -291,7 +298,9 @@ const ConsultationForm = ({ appointmentData, onCancel, onSuccess }) => {
                 className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 bg-white"
               >
                 {[...Array(11).keys()].map((n) => (
-                  <option key={n} value={n.toString()}>{n}</option>
+                  <option key={n} value={n.toString()}>
+                    {n}
+                  </option>
                 ))}
               </select>
             </div>
@@ -469,7 +478,7 @@ const ConsultationForm = ({ appointmentData, onCancel, onSuccess }) => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Onset</label>
               <input
@@ -503,17 +512,6 @@ const ConsultationForm = ({ appointmentData, onCancel, onSuccess }) => {
                 className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Treatment Tried</label>
-              <input
-                type="text"
-                name="treatmentTried"
-                placeholder="Paracetamol"
-                value={formData.treatmentTried}
-                onChange={handleChange}
-                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              />
-            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -541,64 +539,44 @@ const ConsultationForm = ({ appointmentData, onCancel, onSuccess }) => {
               />
             </div>
           </div>
-        </div>
 
-        {/* SECTION 4: Diagnosis & Plan */}
-        <div className="pt-4 border-t border-slate-100 space-y-4">
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            Diagnosis & Treatment Plan
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Diagnosis Code / Condition</label>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+              <FlaskConical size={14} className="text-purple-600" /> Lab Tests / Document IDs
+            </label>
+            <div className="flex gap-2">
               <input
                 type="text"
-                name="diagnosisCode"
-                placeholder="e.g. Malaria, Acute Gastritis"
-                value={formData.diagnosisCode}
-                onChange={handleChange}
-                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-semibold text-blue-700"
+                placeholder="Enter test code / ID..."
+                value={currentTestInput}
+                onChange={(e) => setCurrentTestInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddTest(e)}
+                className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
+              <button
+                type="button"
+                onClick={handleAddTest}
+                className="px-3 py-2 bg-slate-800 text-white text-xs font-medium rounded-lg hover:bg-slate-900 transition-colors"
+              >
+                Add
+              </button>
             </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                <Clock size={13} className="text-slate-400" /> Follow-Up Date
-              </label>
-              <input
-                type="date"
-                name="followUpDate"
-                value={formData.followUpDate}
-                onChange={handleChange}
-                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Prescribed Medications</label>
-              <textarea
-                name="medications"
-                rows={3}
-                placeholder="List prescribed medicines and dosages..."
-                value={formData.medications}
-                onChange={handleChange}
-                className="w-full p-2.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Treatment Plan & Additional Notes</label>
-              <textarea
-                name="plan"
-                rows={3}
-                placeholder="Management plan, lab tests, advice..."
-                value={formData.plan}
-                onChange={handleChange}
-                className="w-full p-2.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              />
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {formData.tests.map((testId, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs border border-slate-200 font-mono"
+                >
+                  {testId}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveTest(idx)}
+                    className="text-slate-400 hover:text-slate-700"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
             </div>
           </div>
         </div>
@@ -609,7 +587,7 @@ const ConsultationForm = ({ appointmentData, onCancel, onSuccess }) => {
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-xs font-medium hover:bg-slate-50"
+              className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-xs font-medium hover:bg-slate-50 transition-colors"
             >
               Cancel
             </button>

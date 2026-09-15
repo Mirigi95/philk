@@ -14,6 +14,7 @@ import ConsultationForm from './front/Connsultations.js';
 import TreatmentForm from './front/Treatment.js';
 import ConsultationsList from './front/ConsultationList.js';
 import PatientTreatmentHistory from './front/PatientHistory.js';
+import PatientLabTests from './front/PatientLabTest.js';
 
 function AppContent() {
   useAutoLogout(15);
@@ -23,7 +24,7 @@ function AppContent() {
       <Route path="/login" element={<Login />} />
 
       <Route element={<ProtectedRoute />}>
-        <Route path="/admin" element={<AdminLayout />}>
+        <Route path="/admin" element={<AdminDashboard />}>
           <Route index element={<AdminDashboard/>} />
           <Route path="client" element={<NewClient />} />
           <Route path='list' element={<ClientList/>} />
@@ -32,6 +33,7 @@ function AppContent() {
           <Route path='constlist' element={<ConsultationsList />} />
           <Route path='history' element={<PatientTreatmentHistory />} />
            <Route path='treatment' element={<TreatmentForm />} />
+           <Route path='labtest' element={<PatientLabTests />} />
         </Route>
       </Route>
     </Routes>

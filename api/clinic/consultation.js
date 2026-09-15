@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   const treatmentCollection = firestore
     .collection("facility")
     .doc(tenantId)
-    .collection("consultations"); // or "clients" depending on your subcollection architecture
+    .collection("consultations");
 
   switch (method) {
     case "POST": {
@@ -31,6 +31,7 @@ export default async function handler(req, res) {
           treatmentTried = "",
           historyOfIllness = "",
           reviewOfSystems = "",
+          tests = [], // Form sends array of lab test IDs/names
           physicalExam = "",
           assessment = "",
           diagnosisCode = "",
@@ -41,17 +42,17 @@ export default async function handler(req, res) {
           hasAllergies = false,
           allergies = "",
           hasHistory = false,
-          patientHistory = "null",
-          familyHistory = "null",
+          patientHistory = "",
+          familyHistory = "",
           hasSocialHistory = false,
           socialHistory = "",
           vitalSigns = {},
         } = req.body;
 
         // Basic Validation
-        if (!appointmentId || !chiefComplaint) {
+        if (!chiefComplaint) {
           return res.status(400).json({
-            error: "Missing required fields: appointmentId and chiefComplaint are required.",
+            error: "Missing required field: chiefComplaint is required.",
           });
         }
 
@@ -65,7 +66,12 @@ export default async function handler(req, res) {
           painLevel: String(vitalSigns?.painLevel || "0"),
         };
 
-        // Construct document payload matching your exact Firestore structure
+        // Ensure tests is cleanly stored as an array of strings
+        const formattedTests = Array.isArray(tests)
+          ? tests.map((t) => String(t).trim()).filter(Boolean)
+          : [];
+
+        // Construct document payload matching Firestore schema
         const consultationDoc = {
           appointmentId: String(appointmentId),
           clientId: String(clientId),
@@ -78,6 +84,7 @@ export default async function handler(req, res) {
           treatmentTried: String(treatmentTried),
           historyOfIllness: String(historyOfIllness),
           reviewOfSystems: String(reviewOfSystems),
+          tests: formattedTests,
           physicalExam: String(physicalExam),
           assessment: String(assessment),
           diagnosisCode: String(diagnosisCode),
@@ -90,10 +97,10 @@ export default async function handler(req, res) {
           hasAllergies: Boolean(hasAllergies),
           allergies: Boolean(hasAllergies) ? String(allergies) : "",
           hasHistory: Boolean(hasHistory),
-          patientHistory: hasHistory ? String(patientHistory) : "null",
-          familyHistory: hasHistory ? String(familyHistory) : "null",
+          patientHistory: Boolean(hasHistory) ? String(patientHistory) : "",
+          familyHistory: Boolean(hasHistory) ? String(familyHistory) : "",
           hasSocialHistory: Boolean(hasSocialHistory),
-          socialHistory: hasSocialHistory ? String(socialHistory) : "",
+          socialHistory: Boolean(hasSocialHistory) ? String(socialHistory) : "",
 
           // Nested Maps & System Timestamps
           vitalSigns: formattedVitalSigns,
@@ -104,7 +111,7 @@ export default async function handler(req, res) {
         // Save to Firestore (Auto-generated document ID)
         const docRef = await treatmentCollection.add(consultationDoc);
 
-        // Optionally update appointment status to "completed" or "in-progress"
+        // Update appointment status to "completed" if appointmentId exists
         if (appointmentId) {
           await firestore
             .collection("facility")
@@ -134,16 +141,16 @@ export default async function handler(req, res) {
 
     case "GET": {
       try {
-        const { appointmentId } = req.query;
+        const { appointmentId, clientId } = req.query;
 
-        // Fetch by appointmentId if filtered
+        // Fetch by appointmentId
         if (appointmentId) {
           const snapshot = await treatmentCollection
             .where("appointmentId", "==", appointmentId)
             .get();
 
           if (snapshot.empty) {
-            return res.status(404).json({ message: "No consultation record found" });
+            return res.status(404).json({ message: "No consultation record found for appointment" });
           }
 
           const records = snapshot.docs.map((doc) => ({
@@ -154,7 +161,22 @@ export default async function handler(req, res) {
           return res.status(200).json(records[0]);
         }
 
-        // Fallback: Fetch recent consultations
+        // Fetch by clientId (Patient history view)
+        if (clientId) {
+          const snapshot = await treatmentCollection
+            .where("clientId", "==", clientId)
+            .orderBy("createdAt", "desc")
+            .get();
+
+          const records = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+
+          return res.status(200).json(records);
+        }
+
+        // Fallback: Fetch recent consultations across facility
         const snapshot = await treatmentCollection
           .orderBy("createdAt", "desc")
           .limit(50)
