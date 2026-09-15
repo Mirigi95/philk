@@ -125,7 +125,7 @@ const Login = () => {
           <div className="bg-white/10 p-2.5 rounded-xl backdrop-blur-sm">
             <HeartPulse className="w-8 h-8 text-blue-200" />
           </div>
-          <span className="text-2xl font-bold tracking-tight">PhilCare Clinic</span>
+          <span className="text-2xl font-bold tracking-tight">Migad HMS</span>
         </div>
 
         <div className="relative z-10 my-auto max-w-lg">
@@ -153,7 +153,7 @@ const Login = () => {
         </div>
 
         <div className="relative z-10 text-xs text-blue-200">
-          © {new Date().getFullYear()} PhilCare Clinic Management System. All rights reserved.
+          © {new Date().getFullYear()} Migad Clinic Management System. All rights reserved.
         </div>
       </div>
 
@@ -165,7 +165,7 @@ const Login = () => {
             <div className="bg-blue-600 p-3 rounded-2xl mb-2 text-white">
               <HeartPulse className="w-8 h-8" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-800">PhilCare Clinic</h2>
+            <h2 className="text-2xl font-bold text-slate-800">Migad HMS</h2>
             <p className="text-xs text-slate-500">Healthcare Management Portal</p>
           </div>
 
@@ -320,7 +320,7 @@ const Login = () => {
               <p className="text-xs text-slate-400">
                 Clinic Support:{" "}
                 <a href="mailto:support@philcareclinic.com" className="text-blue-600 hover:underline font-medium">
-                  support@philcareclinic.com
+                  danmirigi@outlook.com
                 </a>
               </p>
             </div>
