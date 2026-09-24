@@ -246,7 +246,7 @@ const ConsultationsList = ({ onSelectPrescription, onCreateNew }) => {
                     <td className="px-4 py-3">
                       <div className="font-semibold text-slate-800 flex items-center gap-1.5">
                         <User size={13} className="text-slate-400" />
-                        {item.patientName || item.patient?.name || "Unknown Patient"}
+                        {item.clientId || item.patient?.name || "Unknown Patient"}
                       </div>
                       <div className="text-[11px] font-mono text-slate-400 mt-0.5">
                         ID: {item.appointmentId || item.id || "N/A"}
