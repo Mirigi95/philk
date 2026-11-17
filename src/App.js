@@ -25,7 +25,7 @@ function AppContent() {
 
       <Route element={<ProtectedRoute />}>
         <Route path="/admin" element={<AdminDashboard />}>
-          <Route index element={<AdminDashboard/>} />
+          <Route index element={<Appointments/>} />
           <Route path="client" element={<NewClient />} />
           <Route path='list' element={<ClientList/>} />
           <Route path='appointment' element={<Appointments />} />

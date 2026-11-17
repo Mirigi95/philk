@@ -17,6 +17,11 @@ export default async function handler(req, res) {
     .doc(tenantId)
     .collection("consultations");
 
+  const appointCollection = firestore
+    .collection("facility")
+    .doc(tenantId)
+    .collection("appointments");
+
   switch (method) {
     case "POST": {
       try {
@@ -112,20 +117,33 @@ export default async function handler(req, res) {
         const docRef = await treatmentCollection.add(consultationDoc);
 
         // Update appointment status to "completed" if appointmentId exists
+        // Update appointment status to "completed" if appointmentId exists
         if (appointmentId) {
-          await firestore
-            .collection("facility")
-            .doc(tenantId)
-            .collection("appointments")
-            .doc(appointmentId)
-            .set(
-              {
-                status: "completed",
-                consultationId: docRef.id,
-                updatedAt: FieldValue.serverTimestamp(),
-              },
-              { merge: true }
-            );
+          try {
+            // Query for the document where the 'appointmentId' field matches
+            const appointmentQuery = await appointCollection
+              .where("appointmentId", "==", String(appointmentId))
+              .limit(1)
+              .get();
+
+            if (!appointmentQuery.empty) {
+              const appointmentDocRef = appointmentQuery.docs[0].ref;
+
+              await appointmentDocRef.set(
+                {
+                  status: "completed",
+                  consultationId: docRef.id,
+                  updatedAt: FieldValue.serverTimestamp(),
+                },
+                { merge: true }
+              );
+              console.log(`Successfully updated appointment field "${appointmentId}" (Doc: ${appointmentDocRef.id}) to completed.`);
+            } else {
+              console.warn(`No appointment found with appointmentId field: "${appointmentId}"`);
+            }
+          } catch (updateErr) {
+            console.error("Failed to update appointment status:", updateErr);
+          }
         }
 
         return res.status(201).json({
