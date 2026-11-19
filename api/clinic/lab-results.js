@@ -1,10 +1,9 @@
-// pages/api/clinic/lab-results.js
 import { firestore } from "../_utilis/firebaseAdmin.js";
 import { verifySession } from "../auth/verify.js";
 import { FieldPath, FieldValue } from "firebase-admin/firestore";
 
 // ---------- Config ----------
-const ALLOWED_ROLES = []; // e.g. ["lab", "admin"]; empty = any signed-in user (checks session.role)
+const ALLOWED_ROLES = []; // e.g. ["lab", "admin"]; empty = any signed-in user
 
 const RESULT_TYPES = ["numeric", "qualitative", "semi_quantitative", "text", "panel"];
 const STATUSES = ["final", "preliminary", "corrected", "amended"];
@@ -32,20 +31,19 @@ const toNum = (v) => {
 const parseDate = (v, field) => {
   if (v === null || v === undefined || v === "") return null;
   const d = new Date(v);
-  if (isNaN(d.getTime())) throw new HttpError(400, `${field} is not a valid date.`);
+  if (Number.isNaN(d.getTime())) throw new HttpError(400, `${field} is not a valid date.`);
   return d;
 };
 
 const worstFlag = (flags) =>
   flags.reduce((worst, f) => (SEVERITY[f] > SEVERITY[worst] ? f : worst), "normal");
 
-// Whitelist + validate the request body. Never spread req.body into Firestore.
 function validatePayload(body) {
   if (!body || typeof body !== "object") throw new HttpError(400, "Request body is required.");
 
-  const appointmentId = clean(body.appointmentId, 128);
-  const clientId = clean(body.clientId, 128);
-  const consultationId = clean(body.consultationId, 128); // optional: looked up by appointmentId if absent
+  const appointmentId = clean(body.appointmentId ?? body.orderId, 128);
+  const clientId = clean(body.clientId ?? body.patientId, 128);
+  const consultationId = clean(body.consultationId, 128);
   const testName = clean(body.testName, 200);
 
   if (!appointmentId || !clientId || !testName) {
@@ -61,7 +59,7 @@ function validatePayload(body) {
   const status = body.status || "final";
   if (!STATUSES.includes(status)) throw new HttpError(400, "Invalid result status.");
 
-  const testedAt = parseDate(body.testedAt, "testedAt") ?? new Date();
+  const testedAt = parseDate(body.testedAt ?? body.recordedAt, "testedAt") ?? new Date();
   const collectedAt = parseDate(body.collectedAt, "collectedAt");
   if (testedAt.getTime() > Date.now() + 5 * 60 * 1000) {
     throw new HttpError(400, "Result time cannot be in the future.");
@@ -113,7 +111,6 @@ function validatePayload(body) {
         flag,
       };
     });
-    // Overall flag is derived server-side, not trusted from the client
     data.flag = worstFlag(data.components.map((c) => c.flag));
   } else {
     data.result = clean(body.result, 5000);
@@ -135,10 +132,17 @@ function validatePayload(body) {
 
 export default async function handler(req, res) {
   const session = await verifySession(req, res);
-  if (!session) return; // verifySession manages 401 response if missing/invalid
+  if (!session) return;
 
-  const tenantId = session.clientId; // facility/tenant (NOT the patient clientId in the body)
-  const recordedBy = session.name || "System";
+  const tenantId = session.clientId;
+  const recordedBy = session.name || session.email || "System";
+
+  if (!tenantId) {
+    return res.status(400).json({
+      error: "Missing facility tenant context in session.",
+      message: "Missing facility tenant context in session.",
+    });
+  }
 
   if (ALLOWED_ROLES.length && !ALLOWED_ROLES.includes(session.role)) {
     return res.status(403).json({
@@ -158,17 +162,23 @@ export default async function handler(req, res) {
       try {
         const { data, consultationId } = validatePayload(req.body);
 
-        // Resolve the consultation: by id if given, otherwise by appointmentId
         let consultRef;
         if (consultationId) {
           consultRef = consultations.doc(consultationId);
         } else {
-          const found = await consultations
-            .where("appointmentId", "==", data.appointmentId)
-            .limit(1)
-            .get();
-          if (found.empty) throw new HttpError(404, "No consultation found for this appointment.");
-          consultRef = found.docs[0].ref;
+          const directSnap = await consultations.doc(data.appointmentId).get();
+          if (directSnap.exists) {
+            consultRef = directSnap.ref;
+          } else {
+            const found = await consultations
+              .where("appointmentId", "==", data.appointmentId)
+              .limit(1)
+              .get();
+            if (found.empty) {
+              throw new HttpError(404, "No consultation found for this appointment.");
+            }
+            consultRef = found.docs[0].ref;
+          }
         }
 
         const resultRef = labResults.doc();
@@ -178,7 +188,6 @@ export default async function handler(req, res) {
           if (!snap.exists) throw new HttpError(404, "Consultation not found.");
           const consult = snap.data();
 
-          // The result must belong to this consultation's appointment and client
           if (consult.appointmentId && consult.appointmentId !== data.appointmentId) {
             throw new HttpError(400, "Appointment does not match this consultation.");
           }
@@ -204,7 +213,6 @@ export default async function handler(req, res) {
             throw new HttpError(400, "There is no existing result to correct or amend.");
           }
 
-          // Full record (kept forever, including corrections)
           tx.set(resultRef, {
             ...data,
             consultationId: consultRef.id,
@@ -212,7 +220,6 @@ export default async function handler(req, res) {
             createdAt: FieldValue.serverTimestamp(),
           });
 
-          // Compact summary on the consultation so the lab table can render it
           const summary = {
             resultId: resultRef.id,
             resultType: data.resultType,
@@ -228,9 +235,10 @@ export default async function handler(req, res) {
             if (data.unit) summary.unit = data.unit;
           }
 
-          const allDone = testNames.every((n) => n === data.testName || consult.results?.[n]);
+          const allDone = testNames.every(
+            (n) => n === data.testName || Boolean(consult.results?.[n])
+          );
 
-          // FieldPath keeps test names containing dots (e.g. "HbA1c (5.5%)") as one literal key
           const updates = [
             new FieldPath("results", data.testName),
             summary,
@@ -239,9 +247,12 @@ export default async function handler(req, res) {
           ];
           if (allDone) {
             updates.push(
-              "labStatus", "completed",
-              "labsCompleted", true,
-              "labsCompletedAt", FieldValue.serverTimestamp()
+              "labStatus",
+              "completed",
+              "labsCompleted",
+              true,
+              "labsCompletedAt",
+              FieldValue.serverTimestamp()
             );
           }
           tx.update(consultRef, ...updates);
@@ -273,8 +284,6 @@ export default async function handler(req, res) {
         if (clientId) query = query.where("clientId", "==", String(clientId));
 
         const hasFilter = consultationId || appointmentId || clientId;
-        // With a filter: no orderBy (avoids needing a composite index), sorted below.
-        // Without: recent results across the facility.
         const snapshot = hasFilter
           ? await query.limit(200).get()
           : await query.orderBy("createdAt", "desc").limit(50).get();
@@ -288,7 +297,7 @@ export default async function handler(req, res) {
               createdAt: row.createdAt?.toDate?.().toISOString() ?? null,
             };
           })
-          .sort((a, b) => String(b.testedAt).localeCompare(String(a.testedAt)));
+          .sort((a, b) => String(b.testedAt || "").localeCompare(String(a.testedAt || "")));
 
         return res.status(200).json(records);
       } catch (error) {

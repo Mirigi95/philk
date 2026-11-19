@@ -169,6 +169,7 @@ export default function AdminDashboard() {
         { label: "Consultation List", route: "/admin/constlist", icon: ClipboardList },
         { label: "Treatment History", route: "/admin/history", icon: History },
         { label: "Lab Tests", route: "/admin/labtest", icon: FlaskConical },
+        { label: "Lab Results", route: "/admin/labresult", icon: FlaskConical },
       ],
     },
     {
@@ -176,7 +177,7 @@ export default function AdminDashboard() {
       items: [
         { label: "Patients", route: "/admin/list", icon: Users },
         { label: "Doctors", route: "/admin/doctors", icon: Stethoscope },
-        { label: "Prescriptions", route: "/admin/prescriptions", icon: Pill },
+        { label: "Prescriptions", route: "/admin/prescription", icon: Pill },
         { label: "Settings", route: "/admin/settings", icon: Settings },
       ],
     },

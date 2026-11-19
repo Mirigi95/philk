@@ -216,6 +216,43 @@ export default async function handler(req, res) {
         });
       }
     }
+    // Add this inside switch (method) in your treatment API handler:
+case "PATCH": {
+  try {
+    const { id, labResults, labStatus, prescriptionStatus } = req.body;
+
+    if (!id) {
+      return res.status(400).json({ error: "Missing record id" });
+    }
+
+    const updatePayload = {
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+
+    if (labResults !== undefined) {
+      updatePayload.labResults = Array.isArray(labResults) ? labResults : [];
+      updatePayload.labStatus = labStatus || "completed";
+      updatePayload.labCompletedBy = session.email || session.name || "Lab Tech";
+      updatePayload.labCompletedAt = FieldValue.serverTimestamp();
+    }
+
+    if (prescriptionStatus !== undefined) {
+      updatePayload.prescriptionStatus = String(prescriptionStatus);
+      updatePayload.dispensedAt = FieldValue.serverTimestamp();
+    }
+
+    await treatmentCollection.doc(String(id)).set(updatePayload, { merge: true });
+
+    return res.status(200).json({
+      message: "Record updated successfully",
+      id,
+      updates: updatePayload,
+    });
+  } catch (error) {
+    console.error("Error updating treatment record:", error);
+    return res.status(500).json({ error: "Failed to update record" });
+  }
+}
 
     default: {
       res.setHeader("Allow", ["GET", "POST"]);

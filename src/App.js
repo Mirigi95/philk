@@ -15,6 +15,8 @@ import TreatmentForm from './front/Treatment.js';
 import ConsultationsList from './front/ConsultationList.js';
 import PatientTreatmentHistory from './front/PatientHistory.js';
 import PatientLabTests from './front/PatientLabTest.js';
+import Prescription from './front/Prescription.js';
+import LabResults from './front/LabResults.js';
 
 function AppContent() {
   useAutoLogout(15);
@@ -34,6 +36,8 @@ function AppContent() {
           <Route path='history' element={<PatientTreatmentHistory />} />
            <Route path='treatment' element={<TreatmentForm />} />
            <Route path='labtest' element={<PatientLabTests />} />
+           <Route path='labresult' element={<LabResults/>} />
+           <Route path='prescription' element={<Prescription />} />
         </Route>
       </Route>
     </Routes>
