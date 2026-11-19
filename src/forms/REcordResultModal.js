@@ -276,6 +276,7 @@ const RecordResultModal = ({ order, testName, onClose, onSaved }) => {
 
             const payload = {
                 orderId: order.id || order._id,
+                appointmentId: order.appointmentId,
                 patientId: order.patientId || order.clientId,
                 testName,
                 resultType,
@@ -398,7 +399,7 @@ const RecordResultModal = ({ order, testName, onClose, onSaved }) => {
                         </p>
                     </div>
                     <div className="text-right text-slate-400 font-mono text-[11px]">
-                        Order ID: {String(order.id || order._id || "").slice(-8)}
+                        Appointment ID: {String(order.appointmentId || order._id || "").slice(-8)}
                     </div>
                 </div>
 

@@ -49,8 +49,9 @@ function validatePayload(body) {
   if (!appointmentId || !clientId || !testName) {
     throw new HttpError(400, "appointmentId, clientId and testName are required.");
   }
-  if (appointmentId.includes("/") || consultationId.includes("/")) {
-    throw new HttpError(400, "Invalid appointmentId or consultationId.");
+  // Only consultationId is a Firestore doc ID path; appointmentId may be a string like "02/11/26"
+  if (consultationId.includes("/")) {
+    throw new HttpError(400, "Invalid consultationId.");
   }
 
   const resultType = body.resultType || "numeric";
@@ -161,12 +162,13 @@ export default async function handler(req, res) {
     case "POST": {
       try {
         const { data, consultationId } = validatePayload(req.body);
+        const safeDocId = data.appointmentId.replace(/\//g, "-");
 
         let consultRef;
         if (consultationId) {
           consultRef = consultations.doc(consultationId);
         } else {
-          const directSnap = await consultations.doc(data.appointmentId).get();
+          const directSnap = await consultations.doc(safeDocId).get();
           if (directSnap.exists) {
             consultRef = directSnap.ref;
           } else {
