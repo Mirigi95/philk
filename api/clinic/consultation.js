@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     .collection("facility")
     .doc(tenantId)
     .collection("consultations");
-
+    
   const appointCollection = firestore
     .collection("facility")
     .doc(tenantId)
@@ -36,7 +36,7 @@ export default async function handler(req, res) {
           treatmentTried = "",
           historyOfIllness = "",
           reviewOfSystems = "",
-          tests = [], // Form sends array of lab test IDs/names
+          tests = [],
           physicalExam = "",
           assessment = "",
           diagnosisCode = "",
@@ -58,6 +58,12 @@ export default async function handler(req, res) {
         if (!chiefComplaint) {
           return res.status(400).json({
             error: "Missing required field: chiefComplaint is required.",
+          });
+        }
+
+        if (!appointmentId) {
+          return res.status(400).json({
+            error: "Missing required field: appointmentId is required for direct linking.",
           });
         }
 
@@ -113,42 +119,23 @@ export default async function handler(req, res) {
           updatedAt: FieldValue.serverTimestamp(),
         };
 
-        // Save to Firestore (Auto-generated document ID)
-        const docRef = await treatmentCollection.add(consultationDoc);
+        // 1. Save consultation using the appointmentId as the exact document ID
+        const consultationRef = treatmentCollection.doc(appointmentId);
+        await consultationRef.set(consultationDoc);
 
-        // Update appointment status to "completed" if appointmentId exists
-        // Update appointment status to "completed" if appointmentId exists
-        if (appointmentId) {
-          try {
-            // Query for the document where the 'appointmentId' field matches
-            const appointmentQuery = await appointCollection
-              .where("appointmentId", "==", String(appointmentId))
-              .limit(1)
-              .get();
-
-            if (!appointmentQuery.empty) {
-              const appointmentDocRef = appointmentQuery.docs[0].ref;
-
-              await appointmentDocRef.set(
-                {
-                  status: "completed",
-                  consultationId: docRef.id,
-                  updatedAt: FieldValue.serverTimestamp(),
-                },
-                { merge: true }
-              );
-              console.log(`Successfully updated appointment field "${appointmentId}" (Doc: ${appointmentDocRef.id}) to completed.`);
-            } else {
-              console.warn(`No appointment found with appointmentId field: "${appointmentId}"`);
-            }
-          } catch (updateErr) {
-            console.error("Failed to update appointment status:", updateErr);
-          }
-        }
+        // 2. Instantly update the appointment status to "completed" using the exact doc ID
+        await appointCollection.doc(appointmentId).set(
+          {
+            status: "completed",
+            consultationId: appointmentId,
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
 
         return res.status(201).json({
-          message: "Consultation created successfully",
-          id: docRef.id,
+          message: "Consultation created and appointment completed successfully",
+          id: appointmentId,
           data: consultationDoc,
         });
       } catch (error) {
@@ -161,22 +148,18 @@ export default async function handler(req, res) {
       try {
         const { appointmentId, clientId } = req.query;
 
-        // Fetch by appointmentId
+        // Fetch by appointmentId (Direct document reference lookup)
         if (appointmentId) {
-          const snapshot = await treatmentCollection
-            .where("appointmentId", "==", appointmentId)
-            .get();
+          const docSnap = await treatmentCollection.doc(appointmentId).get();
 
-          if (snapshot.empty) {
+          if (!docSnap.exists) {
             return res.status(404).json({ message: "No consultation record found for appointment" });
           }
 
-          const records = snapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }));
-
-          return res.status(200).json(records[0]);
+          return res.status(200).json({
+            id: docSnap.id,
+            ...docSnap.data(),
+          });
         }
 
         // Fetch by clientId (Patient history view)

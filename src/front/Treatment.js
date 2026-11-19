@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Pill,
   AlertTriangle,
@@ -28,7 +28,6 @@ const TreatmentForm = ({
   onSuccess,
   onCancel,
 }) => {
-  // Helper to build default or synchronized state
   const buildInitialState = (data) => ({
     appointmentId: data?.appointmentId || data?.id || "",
     clientId: data?.clientId || "",
@@ -63,14 +62,33 @@ const TreatmentForm = ({
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
 
-  // Sync state if selectedConsultation changes after mount
+  // ICD search state
+  const [suggestions, setSuggestions] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [searchingIcd, setSearchingIcd] = useState(false);
+  const dropdownRef = useRef(null);
+  const debounceRef = useRef(null);
+
   useEffect(() => {
     if (selectedConsultation) {
       setFormData(buildInitialState(selectedConsultation));
     }
   }, [selectedConsultation]);
 
-  // Standard Field Handler
+  // Close ICD dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
@@ -79,7 +97,52 @@ const TreatmentForm = ({
     }));
   };
 
-  // Vital Signs Handler (Immutable)
+  // Debounced ICD search via backend API
+  const handleCodeChange = (e) => {
+    const value = e.target.value;
+    handleChange(e);
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (value.trim().length > 1) {
+      setSearchingIcd(true);
+      debounceRef.current = setTimeout(async () => {
+        try {
+          const res = await api.get(`/icd/icd-search`, {
+            params: { q: value.trim() },
+          });
+          // Supports both Axios ({ data: { results } }) and fetch-like wrappers
+          const payload = res?.data ?? res;
+          const list = Array.isArray(payload?.results)
+            ? payload.results
+            : Array.isArray(payload)
+            ? payload
+            : [];
+          setSuggestions(list);
+          setShowDropdown(true);
+        } catch (err) {
+          console.error("ICD search failed:", err);
+          setSuggestions([]);
+        } finally {
+          setSearchingIcd(false);
+        }
+      }, 250);
+    } else {
+      setSearchingIcd(false);
+      setSuggestions([]);
+      setShowDropdown(false);
+    }
+  };
+
+  const handleSelectIcdCode = (item) => {
+    setFormData((prev) => ({
+      ...prev,
+      diagnosisCode: item.code || "",
+      diagnosisNotes: item.description || prev.diagnosisNotes,
+    }));
+    setShowDropdown(false);
+  };
+
   const handleVitalChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -91,7 +154,6 @@ const TreatmentForm = ({
     }));
   };
 
-  // Prescription Management (Immutable object updating)
   const handlePrescriptionChange = (index, field, value) => {
     setFormData((prev) => ({
       ...prev,
@@ -115,7 +177,6 @@ const TreatmentForm = ({
     }));
   };
 
-  // Allergy Tags Management
   const handleAddAllergy = (e) => {
     if (e) e.preventDefault();
     const trimmed = currentAllergyInput.trim();
@@ -143,7 +204,6 @@ const TreatmentForm = ({
     }));
   };
 
-  // Lab Tests Management
   const handleAddTest = (e) => {
     if (e) e.preventDefault();
     const trimmed = currentTestInput.trim();
@@ -165,13 +225,11 @@ const TreatmentForm = ({
     }));
   };
 
-  // Submit Handler
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setMessage({ type: "", text: "" });
 
-    // Clean payload of empty prescription rows
     const cleanPrescription = formData.prescription.filter(
       (item) => item.medication.trim() !== "" || item.frequency.trim() !== ""
     );
@@ -187,7 +245,8 @@ const TreatmentForm = ({
       setMessage({ type: "success", text: "Treatment plan saved successfully!" });
       if (onSuccess) onSuccess(response.data);
     } catch (err) {
-      const errorPayload = err.response?.data?.error || err.response?.data?.message || err.message;
+      const errorPayload =
+        err.response?.data?.error || err.response?.data?.message || err.message;
       const errorMsg =
         typeof errorPayload === "object" && errorPayload !== null
           ? errorPayload.message || JSON.stringify(errorPayload)
@@ -209,8 +268,9 @@ const TreatmentForm = ({
             Treatment & Prescription
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Patient ID: <span className="font-mono text-slate-700">{formData.clientId}</span> | 
-            Appt: <span className="font-mono text-slate-700">{formData.appointmentId}</span>
+            Patient ID:{" "}
+            <span className="font-mono text-slate-700">{formData.clientId}</span> | Appt:{" "}
+            <span className="font-mono text-slate-700">{formData.appointmentId}</span>
           </p>
         </div>
         <div className="text-right text-xs text-slate-500">
@@ -299,26 +359,71 @@ const TreatmentForm = ({
           )}
         </div>
 
-        {/* Diagnosis Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Diagnosis Code</label>
+        {/* Diagnosis Summary with ICD Autocomplete */}
+        <div
+          ref={dropdownRef}
+          className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 p-4 rounded-xl border border-slate-100"
+        >
+          <div className="relative">
+            <label className="block text-xs font-medium text-slate-500 mb-1">
+              Diagnosis Code (ICD)
+            </label>
             <input
               type="text"
               name="diagnosisCode"
+              autoComplete="off"
+              placeholder="Search ICD code or condition..."
               value={formData.diagnosisCode}
-              onChange={handleChange}
-              className="w-full px-3 py-2 text-xs font-semibold border border-slate-200 rounded-lg bg-white text-blue-700 focus:outline-none"
+              onChange={handleCodeChange}
+              onFocus={() => {
+                if (suggestions.length > 0 && formData.diagnosisCode.trim().length > 1) {
+                  setShowDropdown(true);
+                }
+              }}
+              className="w-full px-3 py-2 text-xs font-semibold border border-slate-200 rounded-lg bg-white text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
+
+            {showDropdown && (
+              <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto text-xs">
+                {searchingIcd ? (
+                  <div className="px-3 py-2 text-slate-400">Searching ICD codes...</div>
+                ) : suggestions.length > 0 ? (
+                  <ul>
+                    {suggestions.map((item, idx) => (
+                      <li
+                        key={`${item.code}-${idx}`}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelectIcdCode(item);
+                        }}
+                        className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-b-0 flex items-center justify-between gap-2"
+                      >
+                        <span className="font-bold text-blue-700 shrink-0">
+                          {item.code}
+                        </span>
+                        <span className="text-slate-600 truncate">
+                          {item.description}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="px-3 py-2 text-slate-400">No matching ICD codes</div>
+                )}
+              </div>
+            )}
           </div>
+
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Diagnosis Notes</label>
+            <label className="block text-xs font-medium text-slate-500 mb-1">
+              Diagnosis Notes
+            </label>
             <input
               type="text"
               name="diagnosisNotes"
               value={formData.diagnosisNotes}
               onChange={handleChange}
-              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none"
+              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
         </div>
@@ -356,7 +461,9 @@ const TreatmentForm = ({
                         type="text"
                         placeholder="e.g. Amoxyl"
                         value={item.medication}
-                        onChange={(e) => handlePrescriptionChange(idx, "medication", e.target.value)}
+                        onChange={(e) =>
+                          handlePrescriptionChange(idx, "medication", e.target.value)
+                        }
                         className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                       />
                     </td>
@@ -365,7 +472,9 @@ const TreatmentForm = ({
                         type="text"
                         placeholder="e.g. 2/14 or 1 tab x 3 daily"
                         value={item.frequency}
-                        onChange={(e) => handlePrescriptionChange(idx, "frequency", e.target.value)}
+                        onChange={(e) =>
+                          handlePrescriptionChange(idx, "frequency", e.target.value)
+                        }
                         className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                       />
                     </td>
@@ -389,7 +498,9 @@ const TreatmentForm = ({
         {/* Treatment & Lab Tests */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Treatment Procedure</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Treatment Procedure
+            </label>
             <input
               type="text"
               name="treatment"
@@ -531,7 +642,9 @@ const TreatmentForm = ({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Additional Clinical Notes</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Additional Clinical Notes
+            </label>
             <textarea
               name="notes"
               rows={2}

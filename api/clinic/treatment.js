@@ -15,6 +15,12 @@ export default async function handler(req, res) {
     .doc(tenantId)
     .collection("treatments");
 
+  // FIXED: Corrected collection name from "appointmentss" to "appointments"
+  const appointmentCollection = firestore
+    .collection("facility")
+    .doc(tenantId)
+    .collection("appointments");
+
   switch (method) {
     case "POST": {
       try {
@@ -40,9 +46,9 @@ export default async function handler(req, res) {
         // Basic schema normalization
         const formattedPrescription = Array.isArray(prescription)
           ? prescription.map((item) => ({
-              medication: String(item?.medication || ""),
-              frequency: String(item?.frequency || ""),
-            }))
+            medication: String(item?.medication || ""),
+            frequency: String(item?.frequency || ""),
+          }))
           : [];
 
         const formattedVitalSigns = {
@@ -83,6 +89,52 @@ export default async function handler(req, res) {
 
         const docRef = await treatmentCollection.add(treatmentDoc);
 
+        // Update appointment status to completed
+        if (appointmentId) {
+          try {
+            const cleanAppointmentId = String(appointmentId).trim();
+            
+            // OPTION 1: Direct document update (Fastest & most reliable if appointmentId is the Firestore doc ID)
+            const appointmentDocRef = appointmentCollection.doc(cleanAppointmentId);
+            const docSnap = await appointmentDocRef.get();
+
+            if (docSnap.exists) {
+              await appointmentDocRef.set(
+                {
+                  status: "completed",
+                  consultationId: docRef.id,
+                  updatedAt: FieldValue.serverTimestamp(),
+                },
+                { merge: true }
+              );
+              console.log(`Successfully updated appointment document ID: ${cleanAppointmentId} to completed.`);
+            } else {
+              // OPTION 2: Fallback to query if appointmentId is a custom string field rather than the doc ID
+              const appointmentQuery = await appointmentCollection
+                .where("appointmentId", "==", cleanAppointmentId)
+                .limit(1)
+                .get();
+
+              if (!appointmentQuery.empty) {
+                const targetRef = appointmentQuery.docs[0].ref;
+                await targetRef.set(
+                  {
+                    status: "completed",
+                    consultationId: docRef.id,
+                    updatedAt: FieldValue.serverTimestamp(),
+                  },
+                  { merge: true }
+                );
+                console.log(`Successfully updated appointment via field query for: ${cleanAppointmentId}`);
+              } else {
+                console.warn(`No appointment found with ID or field: "${cleanAppointmentId}"`);
+              }
+            }
+          } catch (updateErr) {
+            console.error("Failed to update appointment status:", updateErr);
+          }
+        }
+
         return res.status(201).json({
           message: "Treatment record saved successfully",
           id: docRef.id,
@@ -94,96 +146,76 @@ export default async function handler(req, res) {
       }
     }
 
-   case "GET": {
-  try {
-    const { appointmentId, patientId, clientId, id } = req.query;
+    case "GET": {
+      try {
+        const { appointmentId, patientId, clientId, id } = req.query;
 
-    const targetClientId = clientId || id;
+        const targetClientId = clientId || id;
 
-    let query = treatmentCollection;
+        let query = treatmentCollection;
 
-    if (appointmentId) {
-      query = query.where("appointmentId", "==", String(appointmentId));
-    } else if (patientId) {
-      query = query.where("patientId", "==", String(patientId));
-    } else if (targetClientId) {
-      query = query.where("clientId", "==", String(targetClientId));
+        if (appointmentId) {
+          query = query.where("appointmentId", "==", String(appointmentId));
+        } else if (patientId) {
+          query = query.where("patientId", "==", String(patientId));
+        } else if (targetClientId) {
+          query = query.where("clientId", "==", String(targetClientId));
+        }
+
+        const snapshot = await query.get();
+
+        const toISOString = (value) => {
+          if (!value) return null;
+
+          if (typeof value.toDate === "function") {
+            return value.toDate().toISOString();
+          }
+          if (value instanceof Date) {
+            return value.toISOString();
+          }
+          if (typeof value === "string") {
+            return value;
+          }
+          return null;
+        };
+
+        const records = snapshot.docs.map((doc) => {
+          const data = doc.data();
+
+          const createdAt = toISOString(data.createdAt);
+          const date = toISOString(data.date);
+          const followUpDate = toISOString(data.followUpDate);
+
+          const allergiesList = Array.isArray(data.allergiesList)
+            ? data.allergiesList
+            : data.allergies
+              ? String(data.allergies)
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean)
+              : [];
+
+          return {
+            id: doc.id,
+            ...data,
+            createdAt,
+            date,
+            followUpDate,
+            allergiesList,
+            prescription: Array.isArray(data.prescription) ? data.prescription : [],
+            tests: Array.isArray(data.tests) ? data.tests.map((test) => String(test)) : [],
+            vitalSigns: data.vitalSigns || {},
+          };
+        });
+
+        return res.status(200).json({ records });
+      } catch (error) {
+        console.error("Error retrieving treatments:", error);
+        return res.status(500).json({
+          error: "Failed to retrieve treatment records",
+        });
+      }
     }
-
-    const snapshot = await query.get();
-
-    const toISOString = (value) => {
-      if (!value) return null;
-
-      // Firestore Timestamp
-      if (typeof value.toDate === "function") {
-        return value.toDate().toISOString();
-      }
-
-      // Already a Date
-      if (value instanceof Date) {
-        return value.toISOString();
-      }
-
-      // Already a string
-      if (typeof value === "string") {
-        return value;
-      }
-
-      return null;
-    };
-
-    const records = snapshot.docs.map((doc) => {
-      const data = doc.data();
-
-      const createdAt = toISOString(data.createdAt);
-      const date = toISOString(data.date);
-      const followUpDate = toISOString(data.followUpDate);
-
-      const allergiesList = Array.isArray(data.allergiesList)
-        ? data.allergiesList
-        : data.allergies
-        ? String(data.allergies)
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : [];
-
-      return {
-        id: doc.id,
-
-        ...data,
-
-        // Always return dates as strings
-        createdAt,
-        date,
-        followUpDate,
-
-        // Always return an array
-        allergiesList,
-
-        // Ensure arrays are safe for React
-        prescription: Array.isArray(data.prescription)
-          ? data.prescription
-          : [],
-
-        tests: Array.isArray(data.tests)
-          ? data.tests.map((test) => String(test))
-          : [],
-
-        vitalSigns: data.vitalSigns || {},
-      };
-    });
-
-    return res.status(200).json({ records });
-  } catch (error) {
-    console.error("Error retrieving treatments:", error);
-
-    return res.status(500).json({
-      error: "Failed to retrieve treatment records",
-    });
-  }
-}
 
     default: {
       res.setHeader("Allow", ["GET", "POST"]);

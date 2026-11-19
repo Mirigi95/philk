@@ -16,6 +16,7 @@
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.3",
     "react-scripts": "5.0.1",
+    "react-to-print": "^3.3.0",
     "react-toastify": "^11.1.0",
     "vercel": "^59.11.7",
     "web-vitals": "^2.1.4"
@@ -51,6 +52,6 @@
     "node": "24.x"
   },
   "overrides": {
-  "jwks-rsa": "3.0.1"
-}
+    "jwks-rsa": "3.0.1"
+  }
 }
